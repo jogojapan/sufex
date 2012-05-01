@@ -1,0 +1,2 @@
+#define Sufex_VERSION_MAJOR @Sufex_VERSION_MAJOR@
+#define Sufex_VERSION_MINOR @Sufex_VERSION_MINOR@
