@@ -27,7 +27,7 @@ BOOST_AUTO_TEST_CASE(s2s_parser_test)
     S2SChunk s2s_chunk;
     qi::parse(it,std::end(input),S2SChunkGrammar<decltype(it)>(),s2s_chunk);
     output_str.str("");
-    output_str << s2s_chunk << std::ends;
+    output_str << s2s_chunk;
     std::cout << *exp_it << ":::" << s2s_chunk << std::endl;
     BOOST_CHECK(*exp_it == output_str.str());
     ++exp_it;
