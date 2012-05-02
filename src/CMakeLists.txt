@@ -23,9 +23,14 @@ include_directories("${PROJECT_BINARY_DIR}")
 set(Boost_USE_STATIC_LIBS      ON)
 set(Boost_USE_MULTITHREADED    ON)
 set(Boost_USE_STATIC_RUNTIME   OFF)
-set(Boost_NO_SYSTEM_PATHS      TRUE)
 set(BOOST_MIN_VERSION          1.45.0)
 set(Boost_DEBUG                TRUE)
+
+if (NOT $ENV{BOOST_PATH} STREQUAL "")
+  message (STATUS "Found BOOST_PATH as $ENV{BOOST_PATH}")
+  set (BOOST_ROOT $ENV{BOOST_PATH})
+  set (Boost_NO_SYSTEM_PATHS TRUE)
+endif ()
 
 find_package( Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system )
 
