@@ -110,45 +110,43 @@ namespace sufex {
     ~LargeArray()
     {
       for (const auto &entry : _directory)
-	_pool->free(block_addr(entry));
+	_pool->ordered_free(block_addr(entry));
     }
 
     /** Change the size. This may cause deallocations, allocations and
      * reallocations of blocks as necessary. */
-    void set_size(const pos_t new_size)
+    void resize(const pos_t new_size)
     {
       if (new_size == 0) {
+	/* Clear the large-array if necessary. */
 	for (const auto &entry : _directory)
-	  _pool->free(block_addr(entry));
+	  _pool->ordered_free(block_addr(entry));
 	_pool->clear();
-	this->_total_size = 0;
+	_total_size = 0;
 	return;
       }
-      const std::size_type new_num_blocks = int_div(new_size,this->_units_per_block);
-      while (new_num_blocks < this->_directory.size()) {
-	this->_mem->dealloc(this->_directory.back().first,
-			    this->_directory.back().second);
-	this->_directory.pop_back();
+      const std::size_type new_num_blocks = int_div(new_size,_units_per_block);
+      /* Reduce number of blocks if necessary. */
+      while (new_num_blocks < _directory.size()) {
+	_pool->ordered_free(block_addr(_directory.back()));
+	_directory.pop_back();
       }
-      if (new_num_blocks > this->_directory.size()) {
-	while ((new_num_blocks-1) > this->_directory.size()) {
-	  this->_directory.push_back(std::make_pair(this->_mem->alloc(this->_units_per_block),
-						    this->_units_per_block));
-	}
-	bit32_t new_num_last_block = (new_size % this->_units_per_block);
-	if (new_num_last_block == 0)
-	  new_num_last_block = this->_units_per_block;
-	this->_directory.push_back(std::make_pair(this->_mem->alloc(new_num_last_block),
-						  new_num_last_block));
+      /* Size of the final block. */
+      const block_size_t new_num_last_block = (new_size % _units_per_block);
+      if (new_num_last_block == 0)
+	new_num_last_block = _units_per_block;
+      if (new_num_blocks > _directory.size()) {
+	/* Add blocks if necessary. */
+	while ((new_num_blocks - 1) > _directory.size())
+	  _directory.emplace_back({ _pool->ordered_malloc(_units_per_block),_units_per_block });
+	_directory.emplace_back({ _pool->malloc(new_num_last_block),new_num_last_block });
       } else {
-	bit32_t new_num_last_block = (new_size % this->_units_per_block);
-	if (new_num_last_block == 0)
-	  new_num_last_block = this->_units_per_block;
-	dir_entry_t &last_entry = this->_directory.back();
-	last_entry.first = this->_mem->realloc(last_entry.first,new_num_last_block);
-	last_entry.second = new_num_last_block;
+	/* Re-allocate final block if necessary. */
+	_pool->ordered_free(block_addr(final_entry));
+	_directory.back() = { _pool->malloc(new_num_last_block),new_num_last_block };
       }
-      this->_total_size = new_size;
+      /* Adjust total-size member. */
+      _total_size = new_size;
     }
 
     class iterator;
