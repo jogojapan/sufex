@@ -5,9 +5,9 @@ set (Sufex_VERSION_MAJOR 0)
 set (Sufex_VERSION_MINOR 1)
 
 set (bin_dir bin)
-file (MAKE_DIRECTORY ../${bin_dir})
+file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/${bin_dir})
 set (test_bin_dir bin/test)
-file (MAKE_DIRECTORY ../${test_bin_dir})
+file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/${test_bin_dir})
 
 configure_file (
   "${PROJECT_SOURCE_DIR}/SufexConfig.h.in"
