@@ -32,8 +32,8 @@ namespace sufex {
       namespace qi = boost::spirit::qi;
       qi::parse(cptr,eptr,S2SChunkGrammar<const char*>(),s2s_chunk);
       std::cout << "[PARSE-RESULT]\n"
-		<< s2s_chunk
-		<< std::endl;
+          << s2s_chunk
+          << std::endl;
     }
   };
 
