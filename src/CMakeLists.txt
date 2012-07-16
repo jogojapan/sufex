@@ -44,6 +44,7 @@ endif ()
 
 add_executable (${bin_dir}/S2SParser s2s/S2SParser.cpp)
 add_executable (${bin_dir}/S2SFileParser s2s/S2SFileParser.cpp)
+add_executable (${bin_dir}/rulex rulex/rulex.cpp)
 target_link_libraries (${bin_dir}/S2SFileParser ${Boost_LIBRARIES})
 
 enable_testing ()
