@@ -1,0 +1,17 @@
+eclipse.preferences.version=1
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407.1360123434/LANG/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407.1360123434/LANG/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407.1360123434/LANG/value=en
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407.1360123434/LD_LIBRARY_PATH/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407.1360123434/LD_LIBRARY_PATH/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407.1360123434/LD_LIBRARY_PATH/value=/usr/lib/jvm/java-1.6.0-openjdk-1.6.0.0/jre/lib/i386/client\:/usr/lib/jvm/java-1.6.0-openjdk-1.6.0.0/jre/lib/i386\:/space/software/gmp-5.0.4/lib\:/space/software/gcc-4.7.0/lib\:\:/usr/local/lib
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407.1360123434/append=true
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407.1360123434/appendContributed=true
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407/LANG/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407/LANG/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407/LANG/value=en
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407/LD_LIBRARY_PATH/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407/LD_LIBRARY_PATH/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407/LD_LIBRARY_PATH/value=/space/software/gmp-5.0.4/lib\:/space/software/gcc-4.7.0/lib\:\:/usr/local/lib
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407/append=true
+environment/project/cdt.managedbuild.toolchain.gnu.base.919013407/appendContributed=true
