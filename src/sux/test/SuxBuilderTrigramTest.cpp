@@ -101,13 +101,15 @@ BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_8)
 BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
 {
   const std::basic_string<Char> input { (const Char *)"abcabbbbcc" };
-  CharDistribution expected {
-    CharFrequency { 'b',5 },
-    CharFrequency { 'c',3 },
-    CharFrequency { 'a',2 }
+  vector<CharFrequency> expected {
+    CharFrequency { 'b',0 },
+    CharFrequency { 'c',5 },
+    CharFrequency { 'a',8 }
   };
 
-  CharDistribution actual = Builder::determine_chardistribution(begin(input),end(input));
+  CharDistribution chardistribution { Builder::determine_chardistribution(begin(input),end(input)) };
+  vector<CharFrequency> actual {};
+  move(begin(chardistribution),end(chardistribution),back_inserter(actual));
   sort(begin(actual),end(actual),[](const CharFrequency &cf1, const CharFrequency &cf2) {
     return (cf1.second > cf2.second);
   });

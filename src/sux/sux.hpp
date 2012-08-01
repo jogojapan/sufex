@@ -26,7 +26,7 @@ namespace sux {
   struct SuxBuilder
   {
     typedef std::pair<Char,Pos>            CharFrequency;
-    typedef std::vector<CharFrequency>     CharDistribution;
+    typedef std::unordered_map<Char,Pos>   CharDistribution;
 
     /**
      * Determine the alphabet of characters used in a sequence, and count the number
@@ -39,14 +39,19 @@ namespace sux {
     template <typename Iterator, typename CharExtractor>
     static CharDistribution determine_chardistribution(Iterator from, Iterator to, CharExtractor extractor)
     {
-      std::unordered_map<Char,Pos> freq_table {};
+      /* Count character frequencies. */
+      CharDistribution freq_table {};
       std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
         ++freq_table[extractor(elem)];
       });
-      CharDistribution result {};
-      std::move(std::begin(freq_table),std::end(freq_table),std::back_inserter(result));
+      /* Generate accumulated distribution. */
+      Pos total {};
+      for (auto &cf : freq_table) {
+        std::swap(total,cf.second);
+        total += cf.second;
+      }
 
-      return result;
+      return freq_table;
     }
 
     /**
@@ -110,7 +115,8 @@ namespace sux {
     template <typename Iterator>
     static void sort_23trigrams(Iterator from, Iterator to)
     {
-
+      /* Determine the alphabet and distribution of characters. */
+      CharDistribution chardistribution(determine_chardistribution(from,to,std::get<3>));
     }
 
   };
