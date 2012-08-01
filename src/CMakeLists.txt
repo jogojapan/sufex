@@ -52,4 +52,4 @@ add_executable (${test_bin_dir}/S2SParserTest s2s/test/S2SParserTest.cpp)
 add_test (S2SParserTest ${test_bin_dir}/S2SParserTest)
 
 add_executable (${test_bin_dir}/SuxBuilderTrigramTest sux/test/SuxBuilderTrigramTest.cpp)
-add_test (S2SParserTest ${test_bin_dir}/SuxBuilderTrigramTest)
+add_test (SuxBuilderTrigramTest ${test_bin_dir}/SuxBuilderTrigramTest)

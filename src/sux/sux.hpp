@@ -12,12 +12,53 @@
 #include <tuple>
 #include <vector>
 #include <algorithm>
+#include <iterator>
+#include <unordered_map>
 
 namespace sux {
+
+  template<typename T>
+  inline T& id(T &t) { return t; }
+  template <typename T>
+  inline const T& cid(const T& t) { return t; }
 
   template <typename Char, typename Pos>
   struct SuxBuilder
   {
+    typedef std::pair<Char,Pos>            CharFrequency;
+    typedef std::vector<CharFrequency>     CharDistribution;
+
+    /**
+     * Determine the alphabet of characters used in a sequence, and count the number
+     * of occurrences of each. The result is a sorted vector of <char,frequency> pairs.
+     * The datatype used to represent frequency values is Pos.
+     *
+     * The CharExtractor should be a function type. It is applied to every element of
+     * the sequence to extract a character from it.
+     */
+    template <typename Iterator, typename CharExtractor>
+    static CharDistribution determine_chardistribution(Iterator from, Iterator to, CharExtractor extractor)
+    {
+      std::unordered_map<Char,Pos> freq_table {};
+      std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
+        ++freq_table[extractor(elem)];
+      });
+      CharDistribution result {};
+      std::move(std::begin(freq_table),std::end(freq_table),std::back_inserter(result));
+
+      return result;
+    }
+
+    /**
+     * Version of <code>determine_chardistribution()</code> that uses const identity as char-extractor,
+     * i.e. it assumes the input sequence is a sequence of characters.
+     */
+    template <typename Iterator>
+    static CharDistribution determine_chardistribution(Iterator from, Iterator to)
+    {
+      return determine_chardistribution(from,to,cid<typename std::iterator_traits<Iterator>::value_type>);
+    }
+
     typedef std::tuple<Pos,Char,Char,Char> Trigram;
     typedef std::vector<Trigram>           Trigrams;
 
@@ -64,6 +105,12 @@ namespace sux {
       }
 
       return result;
+    }
+
+    template <typename Iterator>
+    static void sort_23trigrams(Iterator from, Iterator to)
+    {
+
     }
 
   };

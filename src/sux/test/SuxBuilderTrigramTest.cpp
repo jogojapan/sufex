@@ -7,6 +7,7 @@
 #include "../sux.hpp"
 #include <iterator>
 #include <algorithm>
+#include <functional>
 #include <iostream>
 
 using namespace std;
@@ -16,6 +17,8 @@ typedef unsigned short            Pos;
 typedef sux::SuxBuilder<Char,Pos> Builder;
 typedef Builder::Trigram          Trigram;
 typedef Builder::Trigrams         Trigrams;
+typedef Builder::CharFrequency    CharFrequency;
+typedef Builder::CharDistribution CharDistribution;
 
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_3)
 {
@@ -91,6 +94,23 @@ BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_8)
   };
 
   Builder::Trigrams actual = Builder::make_23trigrams(begin(input),end(input));
+  BOOST_CHECK((actual.size() == expected.size()
+      && (equal(begin(actual),end(actual),begin(expected)))));
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
+{
+  const std::basic_string<Char> input { (const Char *)"abcabbbbcc" };
+  CharDistribution expected {
+    CharFrequency { 'b',5 },
+    CharFrequency { 'c',3 },
+    CharFrequency { 'a',2 }
+  };
+
+  CharDistribution actual = Builder::determine_chardistribution(begin(input),end(input));
+  sort(begin(actual),end(actual),[](const CharFrequency &cf1, const CharFrequency &cf2) {
+    return (cf1.second > cf2.second);
+  });
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
