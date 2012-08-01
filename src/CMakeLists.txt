@@ -16,7 +16,7 @@ configure_file (
 
 # Removed -Wshadow from the below to avoid a deluge of warnings from
 # Boost.
-ADD_DEFINITIONS(-std=c++0x -g -O3 -Wall -W -Wpointer-arith -Wcast-qual)
+ADD_DEFINITIONS(-std=c++11 -g -O3 -Wall -W -Wpointer-arith -Wcast-qual -Wcast-align)
 
 include_directories("${PROJECT_BINARY_DIR}")
 
@@ -50,3 +50,6 @@ target_link_libraries (${bin_dir}/S2SFileParser ${Boost_LIBRARIES})
 enable_testing ()
 add_executable (${test_bin_dir}/S2SParserTest s2s/test/S2SParserTest.cpp)
 add_test (S2SParserTest ${test_bin_dir}/S2SParserTest)
+
+add_executable (${test_bin_dir}/SuxBuilderTrigramTest sux/test/SuxBuilderTrigramTest.cpp)
+add_test (S2SParserTest ${test_bin_dir}/SuxBuilderTrigramTest)
