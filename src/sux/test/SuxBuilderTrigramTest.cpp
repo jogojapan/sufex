@@ -107,12 +107,27 @@ BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
     CharFrequency { 'a',8 }
   };
 
-  CharDistribution chardistribution { Builder::determine_chardistribution(begin(input),end(input)) };
-  vector<CharFrequency> actual {};
-  move(begin(chardistribution),end(chardistribution),back_inserter(actual));
-  sort(begin(actual),end(actual),[](const CharFrequency &cf1, const CharFrequency &cf2) {
-    return (cf1.second > cf2.second);
-  });
-  BOOST_CHECK((actual.size() == expected.size()
-      && (equal(begin(actual),end(actual),begin(expected)))));
+  CharDistribution actual { Builder::accumulated_charcounts(begin(input),end(input)) };
+  BOOST_CHECK(actual.size() == 3);
+  Pos next_count {};
+  auto it(begin(actual));
+  cout << it->first << ',' << it->second << '\n';
+  BOOST_CHECK(it->second == next_count);
+  switch (it->first) {
+  case 'a': next_count += 2; break;
+  case 'b': next_count += 5; break;
+  case 'c': next_count += 3; break;
+  }
+  ++it;
+  cout << it->first << ',' << it->second << '\n';
+  BOOST_CHECK(it->second == next_count);
+  switch (it->first) {
+  case 'a': next_count += 2; break;
+  case 'b': next_count += 5; break;
+  case 'c': next_count += 3; break;
+  }
+  ++it;
+  cout << it->first << ',' << it->second << '\n';
+  BOOST_CHECK(it->second == next_count);
+  cout.flush();
 }
