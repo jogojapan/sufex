@@ -135,7 +135,7 @@ namespace sux {
     static void sort_23trigrams(std::vector<Elem> &trigrams)
     {
       /* Determine the alphabet and distribution of trigram-final characters. */
-      CharDistribution bucket_sizes { determine_chardistribution(from,to,std::get<3>) };
+      CharDistribution bucket_sizes { accumulated_charcounts(std::begin(trigrams),std::end(trigrams),std::get<3>) };
       /* Radix sort, first pass. */
       std::vector<Elem> temp_vec {};
       bucket_sort(
