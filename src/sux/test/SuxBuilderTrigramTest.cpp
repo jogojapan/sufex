@@ -102,32 +102,37 @@ BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
 {
   const std::basic_string<Char> input { (const Char *)"abcabbbbcc" };
   vector<CharFrequency> expected {
-    CharFrequency { 'b',0 },
-    CharFrequency { 'c',5 },
-    CharFrequency { 'a',8 }
+    CharFrequency { 'a',0 },
+    CharFrequency { 'b',2 },
+    CharFrequency { 'c',7 }
   };
 
   CharDistribution actual { Builder::accumulated_charcounts(begin(input),end(input)) };
   BOOST_CHECK(actual.size() == 3);
-  Pos next_count {};
-  auto it(begin(actual));
-  cout << it->first << ',' << it->second << '\n';
-  BOOST_CHECK(it->second == next_count);
-  switch (it->first) {
-  case 'a': next_count += 2; break;
-  case 'b': next_count += 5; break;
-  case 'c': next_count += 3; break;
+  BOOST_CHECK(equal(begin(actual),end(actual),begin(expected),
+      [](const CharFrequency &f1, const CharFrequency &f2){
+    return ((f1.first == f2.first) && (f1.second == f2.second));
+  }));
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test)
+{
+  const std::basic_string<Char> input { (const Char *)"aecabfgc" };
+  Builder::Trigrams expected {
+    Trigram { 4,'b','f','g' },
+    Trigram { 2,'c','a','b' },
+    Trigram { 1,'e','c','a' },
+    Trigram { 5,'f','g','c' }
+  };
+
+  Builder::Trigrams actual = Builder::make_23trigrams(begin(input),end(input));
+  Builder::sort_23trigrams(actual);
+  for (const Trigram trigram : actual) {
+    std::cout << std::get<1>(trigram) << ','
+        << std::get<2>(trigram) << ','
+        << std::get<3>(trigram) << '\n';
   }
-  ++it;
-  cout << it->first << ',' << it->second << '\n';
-  BOOST_CHECK(it->second == next_count);
-  switch (it->first) {
-  case 'a': next_count += 2; break;
-  case 'b': next_count += 5; break;
-  case 'c': next_count += 3; break;
-  }
-  ++it;
-  cout << it->first << ',' << it->second << '\n';
-  BOOST_CHECK(it->second == next_count);
-  cout.flush();
+  std::cout.flush();
+  BOOST_CHECK((actual.size() == expected.size()
+      && (equal(begin(actual),end(actual),begin(expected)))));
 }

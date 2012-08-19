@@ -13,7 +13,7 @@
 #include <vector>
 #include <algorithm>
 #include <iterator>
-#include <unordered_map>
+#include <map>
 
 namespace sux {
 
@@ -25,15 +25,16 @@ namespace sux {
   template <typename Char, typename Pos>
   struct SuxBuilder
   {
-    typedef std::pair<Char,Pos>            CharFrequency;
-    typedef std::unordered_map<Char,Pos>   CharDistribution;
+    typedef std::pair<Char,Pos>  CharFrequency;
+    typedef std::map<Char,Pos>   CharDistribution;
 
     /**
      * Determine the alphabet of characters used in a sequence, count the number
      * of occurrences of each, and provide accumulated counts. The result is an
-     * unordered map from char to accumulated-count. The accumulated count
+     * ordered map from char to accumulated-count. The accumulated count
      * if the sum of the counts of all previous characters, NOT including the
-     * present character itself. The order of characters is arbitrary.
+     * present character itself. The order of characters is the one defined by the
+     * ordering of the map (std::less<Char> by default).
      * The datatype used to represent frequency values is Pos.
      *
      * The CharExtractor should be a function type. It is applied to every element of
@@ -58,8 +59,8 @@ namespace sux {
     }
 
     /**
-     * Version of <code>determine_chardistribution()</code> that uses const identity as char-extractor,
-     * i.e. it assumes the input sequence is a sequence of characters.
+     * Version of <code>determine_chardistribution()</code> that uses const identity as
+     * char-extractor, i.e. it assumes the input sequence is a sequence of characters.
      */
     template <typename Iterator>
     static CharDistribution accumulated_charcounts(Iterator from, Iterator to)
@@ -76,7 +77,7 @@ namespace sux {
         std::vector<Elem> &to_vec)
     {
       to_vec.resize(std::distance(from,to));
-      while (from < to)
+      while (from != to)
       {
         to_vec[bucket_sizes[extractor(*from)]++] = *from;
         ++from;
@@ -134,13 +135,32 @@ namespace sux {
     template <typename Elem>
     static void sort_23trigrams(std::vector<Elem> &trigrams)
     {
+      /* Extractor function for the third character of every trigram. */
+      auto extractor3 = [](const Trigram &trigram) { return std::get<3>(trigram); };
       /* Determine the alphabet and distribution of trigram-final characters. */
-      CharDistribution bucket_sizes { determine_chardistribution(from,to,std::get<3>) };
+      CharDistribution bucket_sizes {
+        accumulated_charcounts(
+            std::begin(trigrams),std::end(trigrams),extractor3)
+      };
       /* Radix sort, first pass. */
       std::vector<Elem> temp_vec {};
       bucket_sort(
-          std::begin(trigrams),std::end(trigrams),std::get<3>,bucket_sizes,temp_vec);
-      /* Fresh bucket size calculation. */
+          std::begin(trigrams),std::end(trigrams),extractor3,bucket_sizes,temp_vec);
+      std::swap(trigrams,temp_vec);
+      /* Fresh bucket size calculation and radix sort, second pass. */
+      auto extractor2 = [](const Trigram &trigram) { return std::get<2>(trigram); };
+      bucket_sizes = accumulated_charcounts(
+          std::begin(trigrams),std::end(trigrams),extractor2);
+      bucket_sort(
+          std::begin(trigrams),std::end(trigrams),extractor2,bucket_sizes,temp_vec);
+      std::swap(trigrams,temp_vec);
+      /* Fresh bucket size calculation and radix sort, second pass. */
+      auto extractor1 = [](const Trigram &trigram) { return std::get<1>(trigram); };
+      bucket_sizes = accumulated_charcounts(
+          std::begin(trigrams),std::end(trigrams),extractor1);
+      bucket_sort(
+          std::begin(trigrams),std::end(trigrams),extractor1,bucket_sizes,temp_vec);
+      std::swap(trigrams,temp_vec);
     }
 
   };
