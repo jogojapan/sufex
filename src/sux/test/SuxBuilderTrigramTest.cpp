@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <iomanip>
+#include <chrono>
 
 using namespace std;
 
@@ -142,21 +144,50 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
 
 BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
 {
+  /* Prepare for precise time measurements. */
+  typedef chrono::high_resolution_clock       Clock;
+  typedef chrono::duration<double,std::milli> MS;
+
   /* Generate a random string of 40m characters. */
   constexpr std::size_t N = 40 * 1024 * 1024;
   std::basic_string<Char> input;
   input.resize(N);
   std::generate_n(std::begin(input),N,rlxutil::RandomSequenceGeneratorUniform<Char>(' ','z'));
 
+  /* Generate trigrams. */
   LTrigrams actual = Builder::make_23trigrams(begin(input),end(input));
+  /* Make a copy of the trigrams, which will later be sorted them separately. */
+  LTrigrams expected { actual };
+
+  /* Trigam sort. */
+  auto tp1 = Clock::now();
   LBuilder::sort_23trigrams(actual);
-  for (const LTrigram trigram : actual) {
-    std::cout << std::get<1>(trigram)
-        << std::get<2>(trigram)
-        << std::get<3>(trigram)
-        << '\n';
-  }
-  std::cout.flush();
-//  BOOST_CHECK((actual.size() == expected.size()
-//      && (equal(begin(actual),end(actual),begin(expected)))));
+  auto tp2 = Clock::now();
+  /* Alternative trigram sort, as reference. */
+  auto tp3 = Clock::now();
+  std::stable_sort(std::begin(expected),std::end(expected),
+      [](const LTrigram &tri1, const LTrigram &tri2) {
+      return ((std::get<1>(tri1) < std::get<1>(tri2))
+          || ((std::get<1>(tri1) == std::get<1>(tri2)) && (std::get<2>(tri1) < std::get<2>(tri2)))
+          || ((std::get<1>(tri1) == std::get<1>(tri2)) && (std::get<2>(tri1) == std::get<2>(tri2)) && (std::get<3>(tri1) < std::get<3>(tri2))));
+    });
+  auto tp4 = Clock::now();
+
+//  for (const LTrigram trigram : actual) {
+//    std::cout << std::get<1>(trigram)
+//        << std::get<2>(trigram)
+//        << std::get<3>(trigram)
+//        << '\n';
+//  }
+  cout << setw(18) << "Total trigrams:" << setw(10)
+      << distance(begin(expected),end(expected)) << '\n'
+      << fixed << setprecision(3)
+      << setw(18) << "Radix sort:" << setw(10)
+      << chrono::duration_cast<MS>(tp2-tp1).count()
+      << " ms\n"
+      << setw(18) << "Stable sort:" << setw(10)
+      << chrono::duration_cast<MS>(tp4-tp3).count()
+      << " ms" << endl;
+  //std::cout.flush();
+  BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
 }
