@@ -5,6 +5,7 @@
 #include <boost/test/included/unit_test.hpp>
 
 #include "../sux.hpp"
+#include "../../util/random.hpp"
 #include <iterator>
 #include <algorithm>
 #include <functional>
@@ -14,11 +15,19 @@ using namespace std;
 
 typedef unsigned char             Char;
 typedef unsigned short            Pos;
+typedef unsigned long             LPos;
+
 typedef sux::SuxBuilder<Char,Pos> Builder;
 typedef Builder::Trigram          Trigram;
 typedef Builder::Trigrams         Trigrams;
 typedef Builder::CharFrequency    CharFrequency;
 typedef Builder::CharDistribution CharDistribution;
+
+typedef sux::SuxBuilder<Char,LPos> LBuilder;
+typedef Builder::Trigram           LTrigram;
+typedef Builder::Trigrams          LTrigrams;
+typedef Builder::CharFrequency     LCharFrequency;
+typedef Builder::CharDistribution  LCharDistribution;
 
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_3)
 {
@@ -115,7 +124,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
   }));
 }
 
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test)
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
 {
   const std::basic_string<Char> input { (const Char *)"aecabfgc" };
   Builder::Trigrams expected {
@@ -127,12 +136,27 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test)
 
   Builder::Trigrams actual = Builder::make_23trigrams(begin(input),end(input));
   Builder::sort_23trigrams(actual);
-  for (const Trigram trigram : actual) {
-    std::cout << std::get<1>(trigram) << ','
-        << std::get<2>(trigram) << ','
-        << std::get<3>(trigram) << '\n';
-  }
-  std::cout.flush();
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
+{
+  /* Generate a random string of 40m characters. */
+  constexpr std::size_t N = 40 * 1024 * 1024;
+  std::basic_string<Char> input;
+  input.resize(N);
+  std::generate_n(std::begin(input),N,rlxutil::RandomSequenceGeneratorUniform<Char>(' ','z'));
+
+  LTrigrams actual = Builder::make_23trigrams(begin(input),end(input));
+  LBuilder::sort_23trigrams(actual);
+  for (const LTrigram trigram : actual) {
+    std::cout << std::get<1>(trigram)
+        << std::get<2>(trigram)
+        << std::get<3>(trigram)
+        << '\n';
+  }
+  std::cout.flush();
+//  BOOST_CHECK((actual.size() == expected.size()
+//      && (equal(begin(actual),end(actual),begin(expected)))));
 }
