@@ -173,12 +173,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
     });
   auto tp4 = Clock::now();
 
-//  for (const LTrigram trigram : actual) {
-//    std::cout << std::get<1>(trigram)
-//        << std::get<2>(trigram)
-//        << std::get<3>(trigram)
-//        << '\n';
-//  }
+  /* Print time measurements. */
   cout << setw(18) << "Total trigrams:" << setw(10)
       << distance(begin(expected),end(expected)) << '\n'
       << fixed << setprecision(3)
@@ -188,6 +183,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
       << setw(18) << "Stable sort:" << setw(10)
       << chrono::duration_cast<MS>(tp4-tp3).count()
       << " ms" << endl;
-  //std::cout.flush();
+
+  /* Check for equality of the two results. */
   BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
 }
