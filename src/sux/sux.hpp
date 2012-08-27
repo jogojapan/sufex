@@ -195,12 +195,26 @@ namespace sux {
       /* Extractor function for the third character of every trigram. */
       auto extractor3 = [](const Trigram &trigram) { return std::get<3>(trigram); };
       /* Determine the alphabet and distribution of trigram-final characters. */
-      std::vector<std::future<CharDistribution>> buckets_vec {};
+      std::vector<std::future<CharDistribution>> buckets_future_vec {};
       for (const std::pair<It,It> &offset : offsets)
       {
-        buckets_vec.emplace_back([&trigrams,&offset]() {
+        /* CHECK THIS. We shouldn't compute accumulated buckets here,
+         just total frequency per character. */
+        buckets_future_vec.emplace_back([&trigrams,&offset]() {
           accumulated_charcounts(offset.first,offset.second,extractor3)
         });
+      }
+      CharDistribution cumul_buckets {};
+      std::vector<CharDistribution> buckets_vec {};
+      for (auto &local_buckets : buckets_future_vec) {
+        /* Push copy of accumulated buckets to the end of the vector. */
+        buckets_vec.push_back(cumul_buckets);
+        auto &current { buckets_vec.back() };
+        /* Move the new buckets out of the future. */
+        CharDistribution buckets { local_buckets.get() };
+        /* Update the cumulated buckets. */
+        for (CharFrequency &entry : buckets)
+          cumul_buckets[entry.first] += entry.second;
       }
       /* CONTINUE HERE. */
       CharDistribution bucket_sizes { accumulated_charcounts(
