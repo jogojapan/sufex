@@ -167,9 +167,12 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
   auto tp3 = Clock::now();
   std::stable_sort(std::begin(expected),std::end(expected),
       [](const LTrigram &tri1, const LTrigram &tri2) {
-      return ((std::get<1>(tri1) < std::get<1>(tri2))
-          || ((std::get<1>(tri1) == std::get<1>(tri2)) && (std::get<2>(tri1) < std::get<2>(tri2)))
-          || ((std::get<1>(tri1) == std::get<1>(tri2)) && (std::get<2>(tri1) == std::get<2>(tri2)) && (std::get<3>(tri1) < std::get<3>(tri2))));
+          return ((LBuilder::triget<1>(tri1) < LBuilder::triget<1>(tri2))
+                  || ((LBuilder::triget<1>(tri1) == LBuilder::triget<1>(tri2))
+                      && (LBuilder::triget<2>(tri1) < LBuilder::triget<2>(tri2)))
+                  || ((LBuilder::triget<1>(tri1) == LBuilder::triget<1>(tri2))
+                      && (LBuilder::triget<2>(tri1) == LBuilder::triget<2>(tri2))
+                      && (LBuilder::triget<3>(tri1) < LBuilder::triget<3>(tri2))));
     });
   auto tp4 = Clock::now();
 

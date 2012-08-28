@@ -18,10 +18,41 @@
 
 namespace sux {
 
+  /** Identity function. Used as auxiliary. */
   template<typename T>
   inline T& id(T &t) { return t; }
   template <typename T>
   inline const T& cid(const T& t) { return t; }
+
+  /** General implementation of trigrams. */
+  template <typename Char, typename Pos>
+  struct TrigramImpl {
+    typedef std::tuple<Pos,Char,Char,Char> type;
+    typedef std::vector<type>              vec_type;
+  
+    template <unsigned i>
+    static Char get(const type &trigram) { return std::get<i>(trigram); }
+  };
+  
+  /** `char` implementation of trigrams. */
+  template <typename Pos>
+  struct TrigramImpl<char,Pos> {
+    typedef std::tuple<Pos,char[3]> type;
+    typedef std::vector<type>       vec_type;
+
+    template <unsigned i>
+    static char get(const type &trigram) { return trigram[i]; }
+  };
+  
+  /** `unsigned char` implementation of trigrams. */
+  template <typename Pos>
+  struct TrigramImpl<unsigned char,Pos> {
+    typedef std::tuple<Pos,unsigned char[3]> type;
+    typedef std::vector<type>                vec_type;
+
+    template <unsigned i>
+    static unsigned char get(const type &trigram) { return trigram[i]; }
+  };
 
   template <typename Char, typename Pos>
   struct SuxBuilder
@@ -85,8 +116,11 @@ namespace sux {
       }
     }
 
-    typedef std::tuple<Pos,Char,Char,Char> Trigram;
-    typedef std::vector<Trigram>           Trigrams;
+    typedef typename TrigramImpl<Char,Pos>::type     Trigram;
+    typedef typename TrigramImpl<Char,Pos>::vec_type Trigrams;
+
+    template <unsigned i>
+    Char triget(const Trigram &tri) { return TrigramImpl<Char,Pos>::get<i>(tri); }
 
     /**
      * Generate a list of trigrams starting at positions not divisible by 3.
@@ -137,7 +171,7 @@ namespace sux {
     static void sort_23trigrams(std::vector<Elem> &trigrams)
     {
       /* Extractor function for the third character of every trigram. */
-      auto extractor3 = [](const Trigram &trigram) { return std::get<3>(trigram); };
+      auto extractor3 = [](const Trigram &trigram) { return triget<3>(trigram); };
       /* Determine the alphabet and distribution of trigram-final characters. */
       CharDistribution bucket_sizes {
         accumulated_charcounts(
@@ -149,14 +183,14 @@ namespace sux {
           std::begin(trigrams),std::end(trigrams),extractor3,bucket_sizes,temp_vec);
       std::swap(trigrams,temp_vec);
       /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor2 = [](const Trigram &trigram) { return std::get<2>(trigram); };
+      auto extractor2 = [](const Trigram &trigram) { return triget<2>(trigram); };
       bucket_sizes = accumulated_charcounts(
           std::begin(trigrams),std::end(trigrams),extractor2);
       bucket_sort(
           std::begin(trigrams),std::end(trigrams),extractor2,bucket_sizes,temp_vec);
       std::swap(trigrams,temp_vec);
       /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor1 = [](const Trigram &trigram) { return std::get<1>(trigram); };
+      auto extractor1 = [](const Trigram &trigram) { return triget<1>(trigram); };
       bucket_sizes = accumulated_charcounts(
           std::begin(trigrams),std::end(trigrams),extractor1);
       bucket_sort(
@@ -167,79 +201,79 @@ namespace sux {
     /**
      * Multithreaded version.
      */
-    template <typename Elem>
-    static void sort_23trigrams(
-        std::vector<Elem> &trigrams,
-        const unsigned     threads)
-    {
-      /* Sanity. */
-      if (threads < 1)
-        sort_23trigrams(trigrams,1);
-      /* Make sure we don't create too many threads. */
-      const std::size_t total { trigrams.size() };
-      if ((threads > 1) && (total/threads < 1000))
-        sort_23trigrams(trigrams,(total/1000==0?1:total/1000));
-
-      /* Determine start and end positions of every thread. */
-      typedef std::vector<Elem>::iterator It;
-      const std::size_t portion { trigrams.size() / threads };
-      std::vector<std::pair<It,It>> offsets { threads };
-      It endpos { std::begin(trigrams) };
-      std::generate(std::begin(offsets,std::end(offsets),
-          [&endpos]() {
-        It startpos { endpos };
-        endpos += portion;
-        return std::make_pair(startpos,endpos);
-      }));
-
-      /* Extractor function for the third character of every trigram. */
-      auto extractor3 = [](const Trigram &trigram) { return std::get<3>(trigram); };
-      /* Determine the alphabet and distribution of trigram-final characters. */
-      std::vector<std::future<CharDistribution>> buckets_future_vec {};
-      for (const std::pair<It,It> &offset : offsets)
-      {
-        /* CHECK THIS. We shouldn't compute accumulated buckets here,
-         just total frequency per character. */
-        buckets_future_vec.emplace_back([&trigrams,&offset]() {
-          accumulated_charcounts(offset.first,offset.second,extractor3)
-        });
-      }
-      CharDistribution cumul_buckets {};
-      std::vector<CharDistribution> buckets_vec {};
-      for (auto &local_buckets : buckets_future_vec) {
-        /* Push copy of accumulated buckets to the end of the vector. */
-        buckets_vec.push_back(cumul_buckets);
-        auto &current { buckets_vec.back() };
-        /* Move the new buckets out of the future. */
-        CharDistribution buckets { local_buckets.get() };
-        /* Update the cumulated buckets. */
-        for (CharFrequency &entry : buckets)
-          cumul_buckets[entry.first] += entry.second;
-      }
-      /* CONTINUE HERE. */
-      CharDistribution bucket_sizes { accumulated_charcounts(
-            std::begin(trigrams),std::end(trigrams),extractor3)
-      };
-      /* Radix sort, first pass. */
-      std::vector<Elem> temp_vec {};
-      bucket_sort(
-          std::begin(trigrams),std::end(trigrams),extractor3,bucket_sizes,temp_vec);
-      std::swap(trigrams,temp_vec);
-      /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor2 = [](const Trigram &trigram) { return std::get<2>(trigram); };
-      bucket_sizes = accumulated_charcounts(
-          std::begin(trigrams),std::end(trigrams),extractor2);
-      bucket_sort(
-          std::begin(trigrams),std::end(trigrams),extractor2,bucket_sizes,temp_vec);
-      std::swap(trigrams,temp_vec);
-      /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor1 = [](const Trigram &trigram) { return std::get<1>(trigram); };
-      bucket_sizes = accumulated_charcounts(
-          std::begin(trigrams),std::end(trigrams),extractor1);
-      bucket_sort(
-          std::begin(trigrams),std::end(trigrams),extractor1,bucket_sizes,temp_vec);
-      std::swap(trigrams,temp_vec);
-    }
+    // template <typename Elem>
+    // static void sort_23trigrams(
+    //     std::vector<Elem> &trigrams,
+    //     const unsigned     threads)
+    // {
+    //   /* Sanity. */
+    //   if (threads < 1)
+    //     sort_23trigrams(trigrams,1);
+    //   /* Make sure we don't create too many threads. */
+    //   const std::size_t total { trigrams.size() };
+    //   if ((threads > 1) && (total/threads < 1000))
+    //     sort_23trigrams(trigrams,(total/1000==0?1:total/1000));
+    // 
+    //   /* Determine start and end positions of every thread. */
+    //   typedef std::vector<Elem>::iterator It;
+    //   const std::size_t portion { trigrams.size() / threads };
+    //   std::vector<std::pair<It,It>> offsets { threads };
+    //   It endpos { std::begin(trigrams) };
+    //   std::generate(std::begin(offsets,std::end(offsets),
+    //       [&endpos]() {
+    //     It startpos { endpos };
+    //     endpos += portion;
+    //     return std::make_pair(startpos,endpos);
+    //   }));
+    // 
+    //   /* Extractor function for the third character of every trigram. */
+    //   auto extractor3 = [](const Trigram &trigram) { return std::get<3>(trigram); };
+    //   /* Determine the alphabet and distribution of trigram-final characters. */
+    //   std::vector<std::future<CharDistribution>> buckets_future_vec {};
+    //   for (const std::pair<It,It> &offset : offsets)
+    //   {
+    //     /* CHECK THIS. We shouldn't compute accumulated buckets here,
+    //      just total frequency per character. */
+    //     buckets_future_vec.emplace_back([&trigrams,&offset]() {
+    //       accumulated_charcounts(offset.first,offset.second,extractor3)
+    //     });
+    //   }
+    //   CharDistribution cumul_buckets {};
+    //   std::vector<CharDistribution> buckets_vec {};
+    //   for (auto &local_buckets : buckets_future_vec) {
+    //     /* Push copy of accumulated buckets to the end of the vector. */
+    //     buckets_vec.push_back(cumul_buckets);
+    //     auto &current { buckets_vec.back() };
+    //     /* Move the new buckets out of the future. */
+    //     CharDistribution buckets { local_buckets.get() };
+    //     /* Update the cumulated buckets. */
+    //     for (CharFrequency &entry : buckets)
+    //       cumul_buckets[entry.first] += entry.second;
+    //   }
+    //   /* CONTINUE HERE. */
+    //   CharDistribution bucket_sizes { accumulated_charcounts(
+    //         std::begin(trigrams),std::end(trigrams),extractor3)
+    //   };
+    //   /* Radix sort, first pass. */
+    //   std::vector<Elem> temp_vec {};
+    //   bucket_sort(
+    //       std::begin(trigrams),std::end(trigrams),extractor3,bucket_sizes,temp_vec);
+    //   std::swap(trigrams,temp_vec);
+    //   /* Fresh bucket size calculation and radix sort, second pass. */
+    //   auto extractor2 = [](const Trigram &trigram) { return std::get<2>(trigram); };
+    //   bucket_sizes = accumulated_charcounts(
+    //       std::begin(trigrams),std::end(trigrams),extractor2);
+    //   bucket_sort(
+    //       std::begin(trigrams),std::end(trigrams),extractor2,bucket_sizes,temp_vec);
+    //   std::swap(trigrams,temp_vec);
+    //   /* Fresh bucket size calculation and radix sort, second pass. */
+    //   auto extractor1 = [](const Trigram &trigram) { return std::get<1>(trigram); };
+    //   bucket_sizes = accumulated_charcounts(
+    //       std::begin(trigrams),std::end(trigrams),extractor1);
+    //   bucket_sort(
+    //       std::begin(trigrams),std::end(trigrams),extractor1,bucket_sizes,temp_vec);
+    //   std::swap(trigrams,temp_vec);
+    // }
 
   };
 
