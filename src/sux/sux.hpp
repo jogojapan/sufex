@@ -100,6 +100,36 @@ namespace sux {
     typedef std::map<Char,Pos>   CharDistribution;
 
     /**
+     * Generate frequency table for the text [from,to).
+     */
+    template <typename Iterator, typename CharExtractor, typename Mapping = CharDistribution>
+    static Mapping generate_freq_table(Iterator from, Iterator to, CharExtractor extractor)
+    {
+      Mapping freq_table {};
+      std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
+        ++freq_table[extractor(elem)];
+      });
+      return freq_table;
+    }
+
+    /**
+     * Transform a character frequency table into an accumulated
+     * frequency table, in-place.
+     *
+     * The Mapping data type may be any data type that provides a
+     * default iterator that dereferences to CharFrequency.
+     */
+    template <typename Mapping>
+    static void accumulate_frequencies(Mapping &freq_table)
+    {
+      Pos total {};
+      for (auto &cf : freq_table) {
+        std::swap(total,cf.second);
+        total += cf.second;
+      }
+    }
+
+    /**
      * Determine the alphabet of characters used in a sequence, count the number
      * of occurrences of each, and provide accumulated counts. The result is an
      * ordered map from char to accumulated-count. The accumulated count
@@ -115,17 +145,10 @@ namespace sux {
     static CharDistribution accumulated_charcounts(Iterator from, Iterator to, CharExtractor extractor)
     {
       /* Count character frequencies. */
-      CharDistribution freq_table {};
-      std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
-        ++freq_table[extractor(elem)];
-      });
+      CharDistribution freq_table { generate_freq_table(from,to,extractor) };
       /* Generate accumulated distribution. */
-      Pos total {};
-      for (auto &cf : freq_table) {
-        std::swap(total,cf.second);
-        total += cf.second;
-      }
-
+      accumulate_frequencies(freq_table);
+      /* Return results. */
       return freq_table;
     }
 
@@ -241,83 +264,114 @@ namespace sux {
     /**
      * Multithreaded version.
      */
-    // template <typename Elem>
-    // static void sort_23trigrams(
-    //     std::vector<Elem> &trigrams,
-    //     const unsigned     threads)
-    // {
-    //   /* Sanity. */
-    //   if (threads < 1)
-    //     sort_23trigrams(trigrams,1);
-    //   /* Make sure we don't create too many threads. */
-    //   const std::size_t total { trigrams.size() };
-    //   if ((threads > 1) && (total/threads < 1000))
-    //     sort_23trigrams(trigrams,(total/1000==0?1:total/1000));
-    // 
-    //   /* Determine start and end positions of every thread. */
-    //   typedef std::vector<Elem>::iterator It;
-    //   const std::size_t portion { trigrams.size() / threads };
-    //   std::vector<std::pair<It,It>> offsets { threads };
-    //   It endpos { std::begin(trigrams) };
-    //   std::generate(std::begin(offsets,std::end(offsets),
-    //       [&endpos]() {
-    //     It startpos { endpos };
-    //     endpos += portion;
-    //     return std::make_pair(startpos,endpos);
-    //   }));
-    // 
-    //   /* Extractor function for the third character of every trigram. */
-    //   auto extractor3 = [](const Trigram &trigram) { return std::get<3>(trigram); };
-    //   /* Determine the alphabet and distribution of trigram-final characters. */
-    //   std::vector<std::future<CharDistribution>> buckets_future_vec {};
-    //   for (const std::pair<It,It> &offset : offsets)
-    //   {
-    //     /* CHECK THIS. We shouldn't compute accumulated buckets here,
-    //      just total frequency per character. */
-    //     buckets_future_vec.emplace_back([&trigrams,&offset]() {
-    //       accumulated_charcounts(offset.first,offset.second,extractor3)
-    //     });
-    //   }
-    //   CharDistribution cumul_buckets {};
-    //   std::vector<CharDistribution> buckets_vec {};
-    //   for (auto &local_buckets : buckets_future_vec) {
-    //     /* Push copy of accumulated buckets to the end of the vector. */
-    //     buckets_vec.push_back(cumul_buckets);
-    //     auto &current { buckets_vec.back() };
-    //     /* Move the new buckets out of the future. */
-    //     CharDistribution buckets { local_buckets.get() };
-    //     /* Update the cumulated buckets. */
-    //     for (CharFrequency &entry : buckets)
-    //       cumul_buckets[entry.first] += entry.second;
-    //   }
-    //   /* CONTINUE HERE. */
-    //   CharDistribution bucket_sizes { accumulated_charcounts(
-    //         std::begin(trigrams),std::end(trigrams),extractor3)
-    //   };
-    //   /* Radix sort, first pass. */
-    //   std::vector<Elem> temp_vec {};
-    //   bucket_sort(
-    //       std::begin(trigrams),std::end(trigrams),extractor3,bucket_sizes,temp_vec);
-    //   std::swap(trigrams,temp_vec);
-    //   /* Fresh bucket size calculation and radix sort, second pass. */
-    //   auto extractor2 = [](const Trigram &trigram) { return std::get<2>(trigram); };
-    //   bucket_sizes = accumulated_charcounts(
-    //       std::begin(trigrams),std::end(trigrams),extractor2);
-    //   bucket_sort(
-    //       std::begin(trigrams),std::end(trigrams),extractor2,bucket_sizes,temp_vec);
-    //   std::swap(trigrams,temp_vec);
-    //   /* Fresh bucket size calculation and radix sort, second pass. */
-    //   auto extractor1 = [](const Trigram &trigram) { return std::get<1>(trigram); };
-    //   bucket_sizes = accumulated_charcounts(
-    //       std::begin(trigrams),std::end(trigrams),extractor1);
-    //   bucket_sort(
-    //       std::begin(trigrams),std::end(trigrams),extractor1,bucket_sizes,temp_vec);
-    //   std::swap(trigrams,temp_vec);
-    // }
+     template <typename Elem>
+     static void sort_23trigrams(
+         std::vector<Elem> &trigrams,
+         const unsigned     threads)
+     {
+       /* Sanity. */
+       if (threads < 1)
+         sort_23trigrams(trigrams,1);
+       /* Make sure we don't create too many threads. */
+       const std::size_t total { trigrams.size() };
+       if ((threads > 1) && (total/threads < 1000))
+         sort_23trigrams(trigrams,(total/1000==0?1:total/1000));
+
+       /* Determine start and end positions of every thread. */
+       typedef typename std::vector<Elem>::iterator It;
+       const std::size_t portion { trigrams.size() / threads };
+       std::vector<std::pair<It,It>> offsets { threads };
+       It endpos { begin(trigrams) };
+       std::generate(begin(offsets,end(offsets),
+           [&endpos]() {
+         It startpos { endpos };
+         endpos += portion;
+         return std::make_pair(startpos,endpos);
+       }));
+       offsets.back().second = end(trigrams);
+
+       /* Extractor function for the third character of every trigram. */
+       auto extractor3 = [](const Trigram &trigram) { return SuxBuilder::triget3(trigram); };
+       /* Determine the alphabet and distribution of trigram-final characters. */
+       std::vector<std::future<CharDistribution>> frqtab_future_vec {};
+       for (const std::pair<It,It> &offset : offsets)
+       {
+         /* Character frequency count for each thread. */
+         frqtab_future_vec.emplace_back([&trigrams,&offset]() {
+           generate_freq_table(offset.first,offset.second,extractor3);
+         });
+       }
+       /* Initialise cumulative frequencies per thread. This will
+        * be filled with the correct values later. */
+       std::vector<CharDistribution> tl_cumul_frqtab_vec {};
+       /* Total frequency, for each character. */
+       CharDistribution cumul_frqtab {};
+       for (auto &it : frqtab_future_vec)
+       {
+         /* Move the thread-local frequency table out
+          * of its future. */
+         CharDistribution tl_frqtab { it.get() };
+         /* Update the total frequency table. */
+         for (CharFrequency &entry : buckets)
+           cumul_frqtab[entry.first] += entry.second;
+         /* Move thread-local frequency table to the end of the
+          * thread-local cumulative frequency table list. Note
+          * that the frequencies are not really cumulative yet;
+          * this will be corrected later. */
+         tl_cumul_frqtab_vec.push_back(std::move(tl_frqtab));
+       }
+       /* Cumulate the entries of the global frequency table. */
+       accumulate_frequencies(cumul_frqtab);
+       /* Correct the cumulative thread-local frequencies. */
+       for (CharDistribution &tl_frqtab : tl_cumul_frqtab_vec) {
+         /* Swap with current version of global cumulative
+          * frequency table. */
+         std::swap(cumul_frqtab,tl_frqtab);
+         /* Add local character frequencies of current thread to
+          * new version of global table. */
+         for (CharFrequency &entry : tl_frqtab)
+           cumul_frqtab[entry.first] += entry.second;
+       }
+       /* Radix sorting threads. */
+       std::vector<std::future<void>> sort_future_vec;
+       std::vector<Elem> temp_vec(trigrams.size());
+       for (const auto &tl_cumul_frqtab : tl_cumul_frqtab_vec)
+       {
+         sort_future_vec.emplace_back([&trigrams,&tl_cumul_frqtab,&temp_vec]() {
+           for_each()
+             {
+             to_vec[bucket_sizes[extractor(*from)]++] = *from;
+             ++from;
+             }
+         });
+       }
+       /* CONTINUE HERE. */
+       CharDistribution bucket_sizes { accumulated_charcounts(
+             std::begin(trigrams),std::end(trigrams),extractor3)
+       };
+       /* Radix sort, first pass. */
+       std::vector<Elem> temp_vec {};
+       bucket_sort(
+           std::begin(trigrams),std::end(trigrams),extractor3,bucket_sizes,temp_vec);
+       std::swap(trigrams,temp_vec);
+       /* Fresh bucket size calculation and radix sort, second pass. */
+       auto extractor2 = [](const Trigram &trigram) { return std::get<2>(trigram); };
+       bucket_sizes = accumulated_charcounts(
+           std::begin(trigrams),std::end(trigrams),extractor2);
+       bucket_sort(
+           std::begin(trigrams),std::end(trigrams),extractor2,bucket_sizes,temp_vec);
+       std::swap(trigrams,temp_vec);
+       /* Fresh bucket size calculation and radix sort, second pass. */
+       auto extractor1 = [](const Trigram &trigram) { return std::get<1>(trigram); };
+       bucket_sizes = accumulated_charcounts(
+           std::begin(trigrams),std::end(trigrams),extractor1);
+       bucket_sort(
+           std::begin(trigrams),std::end(trigrams),extractor1,bucket_sizes,temp_vec);
+       std::swap(trigrams,temp_vec);
+     }
 
   };
 
 }
-
 
 #endif /* SUX_HPP_ */
