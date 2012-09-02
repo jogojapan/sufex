@@ -26,8 +26,8 @@ typedef Builder::CharFrequency    CharFrequency;
 typedef Builder::CharDistribution CharDistribution;
 
 typedef sux::SuxBuilder<Char,LPos> LBuilder;
-typedef Builder::Trigram           LTrigram;
-typedef Builder::Trigrams          LTrigrams;
+typedef LBuilder::Trigram          LTrigram;
+typedef LBuilder::Trigrams         LTrigrams;
 typedef Builder::CharFrequency     LCharFrequency;
 typedef Builder::CharDistribution  LCharDistribution;
 
@@ -155,7 +155,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
   std::generate_n(std::begin(input),N,rlxutil::RandomSequenceGeneratorUniform<Char>(' ','z'));
 
   /* Generate trigrams. */
-  LTrigrams actual = Builder::make_23trigrams(begin(input),end(input));
+  LTrigrams actual = LBuilder::make_23trigrams(begin(input),end(input));
   /* Make a copy of the trigrams, which will later be sorted them separately. */
   LTrigrams expected { actual };
 
@@ -167,12 +167,12 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
   auto tp3 = Clock::now();
   std::stable_sort(std::begin(expected),std::end(expected),
       [](const LTrigram &tri1, const LTrigram &tri2) {
-          return ((LBuilder::triget<1>(tri1) < LBuilder::triget<1>(tri2))
-                  || ((LBuilder::triget<1>(tri1) == LBuilder::triget<1>(tri2))
-                      && (LBuilder::triget<2>(tri1) < LBuilder::triget<2>(tri2)))
-                  || ((LBuilder::triget<1>(tri1) == LBuilder::triget<1>(tri2))
-                      && (LBuilder::triget<2>(tri1) == LBuilder::triget<2>(tri2))
-                      && (LBuilder::triget<3>(tri1) < LBuilder::triget<3>(tri2))));
+          return ((LBuilder::triget1(tri1) < LBuilder::triget1(tri2))
+                  || ((LBuilder::triget1(tri1) == LBuilder::triget1(tri2))
+                      && (LBuilder::triget2(tri1) < LBuilder::triget2(tri2)))
+                  || ((LBuilder::triget1(tri1) == LBuilder::triget1(tri2))
+                      && (LBuilder::triget2(tri1) == LBuilder::triget2(tri2))
+                      && (LBuilder::triget3(tri1) < LBuilder::triget3(tri2))));
     });
   auto tp4 = Clock::now();
 

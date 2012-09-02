@@ -10,6 +10,7 @@
 
 #include <utility>
 #include <tuple>
+#include <array>
 #include <vector>
 #include <algorithm>
 #include <iterator>
@@ -26,32 +27,70 @@ namespace sux {
 
   /** General implementation of trigrams. */
   template <typename Char, typename Pos>
-  struct TrigramImpl {
-    typedef std::tuple<Pos,Char,Char,Char> type;
-    typedef std::vector<type>              vec_type;
+  struct TrigramImpl : public std::tuple<Pos,Char,Char,Char> {
+    typedef std::tuple<Pos,Char,Char,Char> base_type;
+    typedef Char                           char_type;
+    typedef std::vector<TrigramImpl>       vec_type;
   
-    template <unsigned i>
-    static Char get(const type &trigram) { return std::get<i>(trigram); }
+    TrigramImpl():base_type() {}
+
+    TrigramImpl(
+        const Pos pos,
+        const Char c1,
+        const Char c2,
+        const Char c3)
+    :base_type(pos,c1,c2,c3)
+    {}
+
+    Char get1() const { return std::get<1>(*this); }
+    Char get2() const { return std::get<2>(*this); }
+    Char get3() const { return std::get<3>(*this); }
   };
   
   /** `char` implementation of trigrams. */
   template <typename Pos>
-  struct TrigramImpl<char,Pos> {
-    typedef std::tuple<Pos,char[3]> type;
-    typedef std::vector<type>       vec_type;
+  struct TrigramImpl<char,Pos> : public std::tuple<Pos,std::array<unsigned char,3>>
+  {
+    typedef std::tuple<Pos,std::array<unsigned char,3>> base_type;
+    typedef char                                        char_type;
+    typedef std::vector<TrigramImpl>                    vec_type;
 
-    template <unsigned i>
-    static char get(const type &trigram) { return trigram[i]; }
+    TrigramImpl():base_type() {}
+
+    TrigramImpl(
+        const Pos pos,
+        const char c1,
+        const char c2,
+        const char c3)
+    :base_type(pos,{{c1,c2,c3}})
+    {}
+
+    char_type get1() const { return std::get<1>(*this)[0]; }
+    char_type get2() const { return std::get<1>(*this)[1]; }
+    char_type get3() const { return std::get<1>(*this)[2]; }
   };
-  
+
   /** `unsigned char` implementation of trigrams. */
   template <typename Pos>
-  struct TrigramImpl<unsigned char,Pos> {
-    typedef std::tuple<Pos,unsigned char[3]> type;
-    typedef std::vector<type>                vec_type;
+  struct TrigramImpl<unsigned char,Pos> : public std::tuple<Pos,std::array<unsigned char,3>>
+  {
+    typedef std::tuple<Pos,std::array<unsigned char,3>> base_type;
+    typedef unsigned char                               char_type;
+    typedef std::vector<TrigramImpl>                    vec_type;
 
-    template <unsigned i>
-    static unsigned char get(const type &trigram) { return trigram[i]; }
+    TrigramImpl():base_type() {}
+
+    TrigramImpl(
+        const Pos pos,
+        const unsigned char c1,
+        const unsigned char c2,
+        const unsigned char c3)
+    :base_type(pos,{{c1,c2,c3}})
+    {}
+
+    char_type get1() const { return std::get<1>(*this)[0]; }
+    char_type get2() const { return std::get<1>(*this)[1]; }
+    char_type get3() const { return std::get<1>(*this)[2]; }
   };
 
   template <typename Char, typename Pos>
@@ -116,11 +155,12 @@ namespace sux {
       }
     }
 
-    typedef typename TrigramImpl<Char,Pos>::type     Trigram;
+    typedef          TrigramImpl<Char,Pos>           Trigram;
     typedef typename TrigramImpl<Char,Pos>::vec_type Trigrams;
 
-    template <unsigned i>
-    Char triget(const Trigram &tri) { return TrigramImpl<Char,Pos>::get<i>(tri); }
+    static Char triget1(const Trigram &tri) { return tri.get1(); }
+    static Char triget2(const Trigram &tri) { return tri.get2(); }
+    static Char triget3(const Trigram &tri) { return tri.get3(); }
 
     /**
      * Generate a list of trigrams starting at positions not divisible by 3.
@@ -171,7 +211,7 @@ namespace sux {
     static void sort_23trigrams(std::vector<Elem> &trigrams)
     {
       /* Extractor function for the third character of every trigram. */
-      auto extractor3 = [](const Trigram &trigram) { return triget<3>(trigram); };
+      auto extractor3 = [](const Trigram &trigram) { return SuxBuilder::triget3(trigram); };
       /* Determine the alphabet and distribution of trigram-final characters. */
       CharDistribution bucket_sizes {
         accumulated_charcounts(
@@ -183,14 +223,14 @@ namespace sux {
           std::begin(trigrams),std::end(trigrams),extractor3,bucket_sizes,temp_vec);
       std::swap(trigrams,temp_vec);
       /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor2 = [](const Trigram &trigram) { return triget<2>(trigram); };
+      auto extractor2 = [](const Trigram &trigram) { return SuxBuilder::triget2(trigram); };
       bucket_sizes = accumulated_charcounts(
           std::begin(trigrams),std::end(trigrams),extractor2);
       bucket_sort(
           std::begin(trigrams),std::end(trigrams),extractor2,bucket_sizes,temp_vec);
       std::swap(trigrams,temp_vec);
       /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor1 = [](const Trigram &trigram) { return triget<1>(trigram); };
+      auto extractor1 = [](const Trigram &trigram) { return SuxBuilder::triget1(trigram); };
       bucket_sizes = accumulated_charcounts(
           std::begin(trigrams),std::end(trigrams),extractor1);
       bucket_sort(
