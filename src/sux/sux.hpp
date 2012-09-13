@@ -332,7 +332,7 @@ namespace sux {
          for (CharFrequency &entry : tl_frqtab)
            cumul_frqtab[entry.first] += entry.second;
        }
-       /* Radix sorting threads. */
+       /* Radix-sorting threads. */
        std::vector<std::future<void>> sort_future_vec;
        std::vector<Elem> temp_vec(trigrams.size());
        for (const auto &tl_cumul_frqtab : tl_cumul_frqtab_vec)
