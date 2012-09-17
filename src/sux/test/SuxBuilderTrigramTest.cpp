@@ -142,7 +142,56 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
 
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
+//BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
+//{
+//  /* Prepare for precise time measurements. */
+//  typedef chrono::high_resolution_clock       Clock;
+//  typedef chrono::duration<double,std::milli> MS;
+//
+//  /* Generate a random string of 40m characters. */
+//  constexpr std::size_t N = 40 * 1024 * 1024;
+//  std::basic_string<Char> input;
+//  input.resize(N);
+//  std::generate_n(begin(input),N,rlxutil::RandomSequenceGeneratorUniform<Char>(' ','z'));
+//
+//  /* Generate trigrams. */
+//  LTrigrams actual = LBuilder::make_23trigrams(begin(input),end(input));
+//  /* Make a copy of the trigrams, which will later be sorted them separately. */
+//  LTrigrams expected { actual };
+//
+//  /* Trigam sort. */
+//  auto tp1 = Clock::now();
+//  LBuilder::sort_23trigrams(actual);
+//  auto tp2 = Clock::now();
+//  /* Alternative trigram sort, as reference. */
+//  auto tp3 = Clock::now();
+//  std::stable_sort(std::begin(expected),std::end(expected),
+//      [](const LTrigram &tri1, const LTrigram &tri2) {
+//          return ((LBuilder::triget1(tri1) < LBuilder::triget1(tri2))
+//                  || ((LBuilder::triget1(tri1) == LBuilder::triget1(tri2))
+//                      && (LBuilder::triget2(tri1) < LBuilder::triget2(tri2)))
+//                  || ((LBuilder::triget1(tri1) == LBuilder::triget1(tri2))
+//                      && (LBuilder::triget2(tri1) == LBuilder::triget2(tri2))
+//                      && (LBuilder::triget3(tri1) < LBuilder::triget3(tri2))));
+//    });
+//  auto tp4 = Clock::now();
+//
+//  /* Print time measurements. */
+//  cout << setw(18) << "Total trigrams:" << setw(10)
+//      << distance(begin(expected),end(expected)) << '\n'
+//      << fixed << setprecision(3)
+//      << setw(18) << "Radix sort:" << setw(10)
+//      << chrono::duration_cast<MS>(tp2-tp1).count()
+//      << " ms\n"
+//      << setw(18) << "Stable sort:" << setw(10)
+//      << chrono::duration_cast<MS>(tp4-tp3).count()
+//      << " ms" << endl;
+//
+//  /* Check for equality of the two results. */
+//  BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
+//}
+
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
 {
   /* Prepare for precise time measurements. */
   typedef chrono::high_resolution_clock       Clock;
@@ -152,7 +201,8 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
   constexpr std::size_t N = 40 * 1024 * 1024;
   std::basic_string<Char> input;
   input.resize(N);
-  std::generate_n(std::begin(input),N,rlxutil::RandomSequenceGeneratorUniform<Char>(' ','z'));
+  std::generate_n(begin(input),N,
+      rlxutil::RandomSequenceGeneratorUniform<Char>(' ','z'));
 
   /* Generate trigrams. */
   LTrigrams actual = LBuilder::make_23trigrams(begin(input),end(input));
@@ -161,7 +211,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
 
   /* Trigam sort. */
   auto tp1 = Clock::now();
-  LBuilder::sort_23trigrams(actual);
+  LBuilder::sort_23trigrams(actual,1);
   auto tp2 = Clock::now();
   /* Alternative trigram sort, as reference. */
   auto tp3 = Clock::now();
@@ -188,5 +238,5 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test2)
       << " ms" << endl;
 
   /* Check for equality of the two results. */
-  BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
+  //BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
 }
