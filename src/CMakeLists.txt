@@ -20,6 +20,9 @@ ADD_DEFINITIONS(-std=c++11 -g -O3 -pthread -Wall -W -Wpointer-arith -Wcast-qual 
 
 include_directories("${PROJECT_BINARY_DIR}")
 
+# Linker flags
+set(CMAKE_EXE_LINKER_FLAGS "-pthread -rdynamic")
+
 set(Boost_USE_STATIC_LIBS      ON)
 set(Boost_USE_MULTITHREADED    ON)
 set(Boost_USE_STATIC_RUNTIME   OFF)

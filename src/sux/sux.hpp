@@ -53,11 +53,11 @@ namespace sux {
   
   /** `char` implementation of trigrams. */
   template <typename Pos>
-  struct TrigramImpl<char,Pos> : public std::tuple<Pos,std::array<unsigned char,3>>
+  struct TrigramImpl<char,Pos> : public std::tuple<Pos,std::array<char,3>>
   {
-    typedef std::tuple<Pos,std::array<unsigned char,3>> base_type;
-    typedef char                                        char_type;
-    typedef std::vector<TrigramImpl>                    vec_type;
+    typedef std::tuple<Pos,std::array<char,3>> base_type;
+    typedef char                               char_type;
+    typedef std::vector<TrigramImpl>           vec_type;
 
     TrigramImpl():base_type() {}
 
@@ -297,6 +297,7 @@ namespace sux {
 
        /* Extractor function for the third character of every trigram. */
        auto extractor3 = [](const Trigram &trigram) { return SuxBuilder::triget3(trigram); };
+
        /* Determine the alphabet and distribution of extracted characters. */
        std::vector<std::future<CharDistribution>> frqtab_future_vec {};
        for (const std::pair<It,It> &offset : offsets)
@@ -304,18 +305,12 @@ namespace sux {
          std::cerr << "(from,to) == (" << distance(begin(trigrams),offset.first)
              << ","
              << distance(begin(trigrams),offset.second) << ")" << std::endl;
-         generate_freq_table<decltype(offset.first),decltype(extractor3),CharDistribution>(
-             offset.first,offset.second,extractor3);
-         std::cerr << "Done generating freq table." << std::endl;
          /* Character frequency count for each thread. */
          std::future<CharDistribution> fut {
            std::async(std::launch::async,
                generate_freq_table<decltype(offset.first),decltype(extractor3),CharDistribution>,
                offset.first,offset.second,extractor3)
          };
-         std::cerr << "Created future." << std::endl;
-         std::this_thread::sleep_for(std::chrono::seconds(5));
-         std::cerr << "Created future." << std::endl;
          frqtab_future_vec.push_back(std::move(fut));
        }
        /* Initialise cumulative frequencies per thread. This will

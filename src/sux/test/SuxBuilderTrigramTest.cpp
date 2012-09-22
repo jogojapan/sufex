@@ -28,8 +28,8 @@ typedef Builder::CharDistribution CharDistribution;
 typedef sux::SuxBuilder<Char,LPos> LBuilder;
 typedef LBuilder::Trigram          LTrigram;
 typedef LBuilder::Trigrams         LTrigrams;
-typedef Builder::CharFrequency     LCharFrequency;
-typedef Builder::CharDistribution  LCharDistribution;
+typedef LBuilder::CharFrequency    LCharFrequency;
+typedef LBuilder::CharDistribution LCharDistribution;
 
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_3)
 {
@@ -211,7 +211,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
 
   /* Trigam sort. */
   auto tp1 = Clock::now();
-  LBuilder::sort_23trigrams(actual,1);
+  LBuilder::sort_23trigrams(actual,4);
   auto tp2 = Clock::now();
   /* Alternative trigram sort, as reference. */
   auto tp3 = Clock::now();
