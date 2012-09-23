@@ -188,8 +188,8 @@ namespace sux {
       }
     }
 
-    typedef          TrigramImpl<Char,Pos>           Trigram;
-    typedef typename TrigramImpl<Char,Pos>::vec_type Trigrams;
+    typedef TrigramImpl<Char,Pos> Trigram;
+    typedef std::vector<Trigram>  Trigrams;
 
     static Char triget1(const Trigram &tri) { return tri.get1(); }
     static Char triget2(const Trigram &tri) { return tri.get2(); }
@@ -267,97 +267,115 @@ namespace sux {
       std::swap(trigrams,temp_vec);
     }
 
+    template <typename TrigramType, typename Extractor>
+    static void sort_23trigrams_one_pass(
+        const std::vector<TrigramType> &trigrams,
+        std::vector<TrigramType>       &dest_vec,
+        Extractor                       extractor,
+        const unsigned                  threads)
+    {
+      /* Determine start and end positions of each thread. */
+      typedef typename std::vector<TrigramType>::const_iterator It;
+      const std::size_t portion { trigrams.size() / threads };
+      std::vector<std::pair<It,It>> offsets(threads);
+      It endpos { begin(trigrams) };
+      std::generate(begin(offsets),end(offsets),[&endpos,portion]() {
+        It startpos { endpos };
+        endpos += portion;
+        return std::make_pair(startpos,endpos);
+      });
+      offsets.back().second = end(trigrams);
+
+      /* Use thread to determine the alphabet and distribution of
+       * extracted characters. */
+      std::vector<std::future<CharDistribution>> frqtab_future_vec {};
+      for (const std::pair<It,It> &offset : offsets)
+      {
+        /* Character frequency count for each thread. */
+        std::future<CharDistribution> fut {
+          std::async(std::launch::async,
+              generate_freq_table<It,Extractor,CharDistribution>,
+              offset.first,offset.second,extractor)
+        };
+        frqtab_future_vec.push_back(std::move(fut));
+      }
+
+      /* Initialise cumulative frequencies per thread. This will
+       * be filled with the correct values later. */
+      std::vector<CharDistribution> tl_cumul_frqtab_vec {};
+
+      /* Total frequency, for each character. */
+      CharDistribution cumul_frqtab {};
+      for (auto &it : frqtab_future_vec)
+      {
+        /* Move the thread-local frequency table out
+         * of its future. */
+        CharDistribution tl_frqtab { it.get() };
+        /* Update the total frequency table. */
+        for (const CharFrequency &entry : tl_frqtab)
+          cumul_frqtab[entry.first] += entry.second;
+        /* Move thread-local frequency table to the end of the
+         * thread-local cumulative frequency table list. Note
+         * that the frequencies are not really cumulative yet;
+         * this will be corrected later. */
+        tl_cumul_frqtab_vec.push_back(std::move(tl_frqtab));
+      }
+
+      /* Cumulate the entries of the global frequency table. */
+      accumulate_frequencies(cumul_frqtab);
+
+      /* Correct the cumulative thread-local frequencies. */
+      for (CharDistribution &tl_frqtab : tl_cumul_frqtab_vec) {
+        /* Swap with current version of global cumulative
+         * frequency table. */
+        std::swap(cumul_frqtab,tl_frqtab);
+        /* Add local character frequencies of current thread to
+         * new version of global table. */
+        for (const CharFrequency &entry : tl_frqtab)
+          cumul_frqtab[entry.first] += entry.second;
+      }
+      /* Radix-sorting threads. */
+      std::vector<std::future<void>> sort_future_vec;
+      auto tl_cumul_frqtab = tl_cumul_frqtab_vec.begin();
+      for (const std::pair<It,It> &offset : offsets)
+      {
+        sort_future_vec.push_back(std::async(std::launch::async,
+            bucket_sort<It,Extractor,TrigramType>,
+            offset.first,offset.second,extractor,ref(*tl_cumul_frqtab),ref(dest_vec)));
+        ++tl_cumul_frqtab;
+      }
+      for (auto &sort_future : sort_future_vec)
+        sort_future.get();
+    }
+
     /**
      * Multithreaded version.
      */
-     template <typename Elem>
-     static void sort_23trigrams(
-         std::vector<Elem> &trigrams,
-         const unsigned     threads)
-     {
-       /* Sanity. */
-       if (threads < 1)
-         sort_23trigrams(trigrams,1);
-       /* Make sure we don't create too many threads. */
-       const std::size_t total { trigrams.size() };
-       if ((threads > 1) && (total/threads < 1000))
-         sort_23trigrams(trigrams,(total/1000==0?1:total/1000));
+    template <typename TrigramType>
+    static void sort_23trigrams(
+        std::vector<TrigramType> &trigrams,
+        const unsigned            threads)
+    {
+      /* Sanity. */
+      if (threads < 1)
+        sort_23trigrams(trigrams,1);
+      /* Make sure we don't create too many threads. */
+      const std::size_t total { trigrams.size() };
+      if ((threads > 1) && (total/threads < 1000))
+        sort_23trigrams(trigrams,(total/1000==0?1:total/1000));
 
-       /* Determine start and end positions of every thread. */
-       typedef typename std::vector<Elem>::iterator It;
-       const std::size_t portion { trigrams.size() / threads };
-       std::vector<std::pair<It,It>> offsets(threads);
-       It endpos { begin(trigrams) };
-       std::generate(begin(offsets),end(offsets),[&endpos,portion]() {
-         It startpos { endpos };
-         endpos += portion;
-         return std::make_pair(startpos,endpos);
-       });
-       offsets.back().second = end(trigrams);
-
-       /* Extractor function for the third character of every trigram. */
-       auto extractor3 = [](const Trigram &trigram) { return SuxBuilder::triget3(trigram); };
-
-       /* Determine the alphabet and distribution of extracted characters. */
-       std::vector<std::future<CharDistribution>> frqtab_future_vec {};
-       for (const std::pair<It,It> &offset : offsets)
-       {
-         std::cerr << "(from,to) == (" << distance(begin(trigrams),offset.first)
-             << ","
-             << distance(begin(trigrams),offset.second) << ")" << std::endl;
-         /* Character frequency count for each thread. */
-         std::future<CharDistribution> fut {
-           std::async(std::launch::async,
-               generate_freq_table<decltype(offset.first),decltype(extractor3),CharDistribution>,
-               offset.first,offset.second,extractor3)
-         };
-         frqtab_future_vec.push_back(std::move(fut));
-       }
-       /* Initialise cumulative frequencies per thread. This will
-        * be filled with the correct values later. */
-       std::vector<CharDistribution> tl_cumul_frqtab_vec {};
-       /* Total frequency, for each character. */
-       CharDistribution cumul_frqtab {};
-       for (auto &it : frqtab_future_vec)
-       {
-         /* Move the thread-local frequency table out
-          * of its future. */
-         CharDistribution tl_frqtab { it.get() };
-         /* Update the total frequency table. */
-         for (const CharFrequency &entry : tl_frqtab)
-           cumul_frqtab[entry.first] += entry.second;
-         /* Move thread-local frequency table to the end of the
-          * thread-local cumulative frequency table list. Note
-          * that the frequencies are not really cumulative yet;
-          * this will be corrected later. */
-         tl_cumul_frqtab_vec.push_back(std::move(tl_frqtab));
-       }
-       /* Cumulate the entries of the global frequency table. */
-       accumulate_frequencies(cumul_frqtab);
-       /* Correct the cumulative thread-local frequencies. */
-       for (CharDistribution &tl_frqtab : tl_cumul_frqtab_vec) {
-         /* Swap with current version of global cumulative
-          * frequency table. */
-         std::swap(cumul_frqtab,tl_frqtab);
-         /* Add local character frequencies of current thread to
-          * new version of global table. */
-         for (const CharFrequency &entry : tl_frqtab)
-           cumul_frqtab[entry.first] += entry.second;
-       }
-       /* Radix-sorting threads. */
-       std::vector<std::future<void>> sort_future_vec;
-       std::vector<Elem> temp_vec(trigrams.size());
-       auto tl_cumul_frqtab = tl_cumul_frqtab_vec.begin();
-       for (const std::pair<It,It> &offset : offsets)
-       {
-         sort_future_vec.push_back(std::async(std::launch::async,
-             bucket_sort<decltype(offset.first),decltype(extractor3),Elem>,
-             offset.first,offset.second,extractor3,std::ref(*tl_cumul_frqtab),ref(temp_vec)));
-         ++tl_cumul_frqtab;
-       }
-       for (auto &sort_future : sort_future_vec)
-         sort_future.get();
-     }
+      /* Vector for intermediate results. */
+      std::vector<TrigramType> temp_vec(trigrams.size());
+      /* First pass. */
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget3,threads);
+      swap(trigrams,temp_vec);
+      /* Second pass. */
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget2,threads);
+      swap(trigrams,temp_vec);
+      /* Third pass. */
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget1,threads);
+      swap(trigrams,temp_vec);
+    }
 
   };
 
