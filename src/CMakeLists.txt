@@ -35,7 +35,7 @@ if (NOT $ENV{BOOST_PATH} STREQUAL "")
   set (Boost_NO_SYSTEM_PATHS TRUE)
 endif ()
 
-find_package( Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system )
+find_package( Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system chrono)
 
 if (Boost_FOUND)
    include_directories(${Boost_INCLUDE_DIRS})
@@ -55,4 +55,5 @@ add_executable (${test_bin_dir}/S2SParserTest s2s/test/S2SParserTest.cpp)
 add_test (S2SParserTest ${test_bin_dir}/S2SParserTest)
 
 add_executable (${test_bin_dir}/SuxBuilderTrigramTest sux/test/SuxBuilderTrigramTest.cpp)
+target_link_libraries (${test_bin_dir}/SuxBuilderTrigramTest ${Boost_LIBRARIES})
 add_test (SuxBuilderTrigramTest ${test_bin_dir}/SuxBuilderTrigramTest)
