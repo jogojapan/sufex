@@ -29,9 +29,15 @@ namespace sux {
   template <typename T>
   inline const T& cid(const T& t) { return t; }
 
+  /** Implementation of trigrams. */
+  enum class TGImpl { tuple, arraytuple, structure };
+
+  template <TGImpl tgimpl, typename Char, typename Pos>
+  struct TrigramImpl;
+
   /** General implementation of trigrams. */
   template <typename Char, typename Pos>
-  struct TrigramImpl : public std::tuple<Pos,Char,Char,Char> {
+  struct TrigramImpl<TGImpl::tuple,Char,Pos> : public std::tuple<Pos,Char,Char,Char> {
     typedef std::tuple<Pos,Char,Char,Char> base_type;
     typedef Char                           char_type;
     typedef std::vector<TrigramImpl>       vec_type;
@@ -52,20 +58,20 @@ namespace sux {
   };
   
   /** `char` implementation of trigrams. */
-  template <typename Pos>
-  struct TrigramImpl<char,Pos> : public std::tuple<Pos,std::array<char,3>>
+  template <typename Char, typename Pos>
+  struct TrigramImpl<TGImpl::arraytuple,Char,Pos> : public std::tuple<Pos,std::array<Char,3>>
   {
-    typedef std::tuple<Pos,std::array<char,3>> base_type;
-    typedef char                               char_type;
+    typedef std::tuple<Pos,std::array<Char,3>> base_type;
+    typedef Char                               char_type;
     typedef std::vector<TrigramImpl>           vec_type;
 
     TrigramImpl():base_type() {}
 
     TrigramImpl(
         const Pos pos,
-        const char c1,
-        const char c2,
-        const char c3)
+        const Char c1,
+        const Char c2,
+        const Char c3)
     :base_type(pos,{{c1,c2,c3}})
     {}
 
@@ -74,30 +80,29 @@ namespace sux {
     char_type get3() const { return std::get<1>(*this)[2]; }
   };
 
-  /** `unsigned char` implementation of trigrams. */
-  template <typename Pos>
-  struct TrigramImpl<unsigned char,Pos> : public std::tuple<Pos,std::array<unsigned char,3>>
-  {
-    typedef std::tuple<Pos,std::array<unsigned char,3>> base_type;
-    typedef unsigned char                               char_type;
-    typedef std::vector<TrigramImpl>                    vec_type;
+//  template <typename Pos>
+//  struct TrigramImpl<unsigned char,Pos> : public std::tuple<Pos,std::array<unsigned char,3>>
+//  {
+//    typedef std::tuple<Pos,std::array<unsigned char,3>> base_type;
+//    typedef unsigned char                               char_type;
+//    typedef std::vector<TrigramImpl>                    vec_type;
+//
+//    TrigramImpl():base_type() {}
+//
+//    TrigramImpl(
+//        const Pos pos,
+//        const unsigned char c1,
+//        const unsigned char c2,
+//        const unsigned char c3)
+//    :base_type(pos,{{c1,c2,c3}})
+//    {}
+//
+//    char_type get1() const { return std::get<1>(*this)[0]; }
+//    char_type get2() const { return std::get<1>(*this)[1]; }
+//    char_type get3() const { return std::get<1>(*this)[2]; }
+//  };
 
-    TrigramImpl():base_type() {}
-
-    TrigramImpl(
-        const Pos pos,
-        const unsigned char c1,
-        const unsigned char c2,
-        const unsigned char c3)
-    :base_type(pos,{{c1,c2,c3}})
-    {}
-
-    char_type get1() const { return std::get<1>(*this)[0]; }
-    char_type get2() const { return std::get<1>(*this)[1]; }
-    char_type get3() const { return std::get<1>(*this)[2]; }
-  };
-
-  template <typename Char, typename Pos>
+  template <TGImpl tgimpl, typename Char, typename Pos>
   struct SuxBuilder
   {
     typedef std::pair<Char,Pos>  CharFrequency;
@@ -188,8 +193,8 @@ namespace sux {
       }
     }
 
-    typedef TrigramImpl<Char,Pos> Trigram;
-    typedef std::vector<Trigram>  Trigrams;
+    typedef TrigramImpl<tgimpl,Char,Pos> Trigram;
+    typedef std::vector<Trigram>         Trigrams;
 
     static Char triget1(const Trigram &tri) { return tri.get1(); }
     static Char triget2(const Trigram &tri) { return tri.get2(); }
