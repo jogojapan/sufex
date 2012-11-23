@@ -45,6 +45,8 @@ elseif (NOT Boost_FOUND)
   message(STATUS "BOOST_ROOT is ${BOOST_ROOT}. Try setting this environment variable to a different path.")
 endif ()
 
+include("cmake/FindGlog.cmake")
+
 add_executable (${bin_dir}/S2SParser s2s/S2SParser.cpp)
 add_executable (${bin_dir}/S2SFileParser s2s/S2SFileParser.cpp)
 add_executable (${bin_dir}/rulex rulex/rulex.cpp)

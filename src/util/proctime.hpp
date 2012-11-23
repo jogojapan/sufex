@@ -12,8 +12,13 @@
 #define PROCTIME_HPP_
 
 #include <sys/times.h>
+#include <unistd.h>
+#include <cstdint>
 #include <ctime>
 #include <chrono>
+#include <ratio>
+#include <boost/assert.hpp>
+#include <glog/logging.h>
 
 namespace rlxutil {
 
@@ -82,11 +87,24 @@ private:
 
 namespace rlxutil {
 
+static std::intmax_t nanosec_per_tick() {
+  static std::intmax_t result = 0;
+  if (result == 0)
+  {
+    result = ::sysconf(_SC_CLK_TCK);
+    BOOST_ASSERT_MSG(result > 0,
+        "Cannot determine number of clock ticks per second.");
+    BOOST_ASSERT_MSG(result < std::nano::den,
+        "System clock too fast: More than 1 tick per nanosecond.");
+  }
+  return 1000000000l / ::sysconf(_SC_CLK_TCK);
+}
+
 class cpu_clock
 {
 public:
   typedef std::clock_t                                rep;
-  typedef std::ratio<1,CLOCKS_PER_SEC>                period;
+  typedef std::nano                                   period;
   typedef std::chrono::duration<rep,period>           duration;
   typedef std::chrono::time_point<cpu_clock,duration> time_point;
 
@@ -95,7 +113,7 @@ public:
   static time_point now() noexcept {
     tms _internal;
     times(&_internal);
-    return time_point(duration(_internal.tms_utime));
+    return time_point(duration(_internal.tms_utime * nanosec_per_tick()));
   }
 };
 
