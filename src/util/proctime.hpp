@@ -43,24 +43,6 @@ namespace rlxutil {
     return result;
   }
 
-  class cpu_user_clock
-  {
-  public:
-    typedef std::clock_t                                rep;
-    typedef std::nano                                   period;
-    typedef std::chrono::duration<rep,period>           duration;
-    typedef std::chrono::time_point<cpu_user_clock,duration> time_point;
-
-    static constexpr bool is_steady = true;
-
-    static time_point now() noexcept {
-      tms _internal;
-      times(&_internal);
-      return time_point(duration((_internal.tms_utime + _internal.tms_cutime)
-          * nanosec_per_tick()));
-    }
-  };
-
   class combined_clock
   {
   public:
