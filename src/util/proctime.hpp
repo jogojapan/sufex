@@ -23,190 +23,95 @@
 
 namespace rlxutil {
 
-class cpu_user_clock;
-class combined_clock;
-
-}
-
-namespace std {
-namespace chrono {
-
-//template <typename Duration>
-//class time_point<rlxutil::cpu_user_clock,Duration>
-//{
-//public:
-//  typedef rlxutil::cpu_user_clock    clock;
-//  typedef Duration                   duration;
-//  typedef typename Duration::rep     rep;
-//  typedef typename Duration::period  period;
-//
-//  constexpr time_point() : _d(duration::zero())
-//  { }
-//
-//  constexpr explicit time_point(const duration& _dur)
-//    : _d(_dur)
-//  { }
-//
-//  // conversions
-//  template<typename Dur2>
-//  constexpr time_point(const time_point<clock, Dur2>& _t)
-//    : _d(_t.time_since_epoch())
-//  { }
-//
-//  constexpr duration
-//  time_since_epoch() const
-//  { return _d; }
-//
-//  time_point&
-//  operator+=(const duration& _dur)
-//  {
-//    _d += _dur;
-//    return *this;
-//  }
-//
-//  time_point&
-//  operator-=(const duration& _dur)
-//  {
-//    _d -= _dur;
-//    return *this;
-//  }
-//
-//  static constexpr time_point
-//  min()
-//  { return time_point(duration::min()); }
-//
-//  static constexpr time_point
-//  max()
-//  { return time_point(duration::max()); }
-//
-//private:
-//  duration _d;
-//
-//};
-//
-//template <typename Duration>
-//class time_point<rlxutil::combined_clock,Duration>
-//{
-//public:
-//  typedef rlxutil::combined_clock    clock;
-//  typedef Duration                   duration;
-//  typedef typename Duration::rep     rep;
-//  typedef typename Duration::period  period;
-//
-//  constexpr time_point() : _d(duration::zero())
-//  { }
-//
-//  constexpr explicit time_point(const duration& _dur)
-//    : _d(_dur)
-//  { }
-//
-//  // conversions
-//  template<typename Dur2>
-//  constexpr time_point(const time_point<clock, Dur2>& _t)
-//    : _d(_t.time_since_epoch())
-//  { }
-//
-//  constexpr duration
-//  time_since_epoch() const
-//  { return _d; }
-//
-//  time_point&
-//  operator+=(const duration& _dur)
-//  {
-//    _d += _dur;
-//    return *this;
-//  }
-//
-//  time_point&
-//  operator-=(const duration& _dur)
-//  {
-//    _d -= _dur;
-//    return *this;
-//  }
-//
-//  static constexpr time_point
-//  min()
-//  { return time_point(duration::min()); }
-//
-//  static constexpr time_point
-//  max()
-//  { return time_point(duration::max()); }
-//
-//private:
-//  duration _d;
-//
-//};
-
-} // namespace
-} // namespace
-
-namespace rlxutil {
-
-static std::intmax_t nanosec_per_tick() {
-  static std::intmax_t result = 0;
-  if (result == 0)
-  {
-    result = ::sysconf(_SC_CLK_TCK);
-    if (result <= 0) {
-      LOG(ERROR) << "Could not retrieve number of clock ticks per second (_SC_CLK_TCK).";
-      result = -1;
-    } else if (result > std::nano::den) {
-      LOG(ERROR) << "Found more than 1 clock tick per nanosecond. "
-          << "rlxutil::cpu_clock can't handle that.";
-      result = -1;
-    } else {
-      result = std::nano::den / ::sysconf(_SC_CLK_TCK);
-      LOG(INFO) << "Clock ticks per nanosecond: " << result;
+  static std::intmax_t nanosec_per_tick() {
+    static std::intmax_t result = 0;
+    if (result == 0)
+    {
+      result = ::sysconf(_SC_CLK_TCK);
+      if (result <= 0) {
+        LOG(ERROR) << "Could not retrieve number of clock ticks per second (_SC_CLK_TCK).";
+        result = -1;
+      } else if (result > std::nano::den) {
+        LOG(ERROR) << "Found more than 1 clock tick per nanosecond. "
+            << "rlxutil::cpu_clock can't handle that.";
+        result = -1;
+      } else {
+        result = std::nano::den / ::sysconf(_SC_CLK_TCK);
+        LOG(INFO) << "Clock ticks per nanosecond: " << result;
+      }
     }
+    return result;
   }
-  return result;
-}
 
-class cpu_user_clock
-{
-public:
-  typedef std::clock_t                                rep;
-  typedef std::nano                                   period;
-  typedef std::chrono::duration<rep,period>           duration;
-  typedef std::chrono::time_point<cpu_user_clock,duration> time_point;
+  class cpu_user_clock
+  {
+  public:
+    typedef std::clock_t                                rep;
+    typedef std::nano                                   period;
+    typedef std::chrono::duration<rep,period>           duration;
+    typedef std::chrono::time_point<cpu_user_clock,duration> time_point;
 
-  static constexpr bool is_steady = true;
+    static constexpr bool is_steady = true;
 
-  static time_point now() noexcept {
-    tms _internal;
-    times(&_internal);
-    return time_point(duration((_internal.tms_utime + _internal.tms_cutime)
-        * nanosec_per_tick()));
-  }
-};
+    static time_point now() noexcept {
+      tms _internal;
+      times(&_internal);
+      return time_point(duration((_internal.tms_utime + _internal.tms_cutime)
+          * nanosec_per_tick()));
+    }
+  };
 
-class combined_clock
-{
-public:
-  typedef std::tuple<
-      std::clock_t,
-      std::clock_t,
-      std::chrono::high_resolution_clock::rep>             rep;
-  typedef std::nano                                        period;
-  typedef std::chrono::duration<rep,period>                duration;
-  typedef std::chrono::time_point<combined_clock,duration> time_point;
+  class combined_clock
+  {
+  public:
+    typedef std::tuple<
+        std::clock_t,
+        std::clock_t,
+        std::chrono::high_resolution_clock::rep>             rep;
+    typedef std::nano                                        period;
+    typedef std::chrono::duration<rep,period>                duration;
+    typedef std::chrono::time_point<combined_clock,duration> time_point;
 
-  static constexpr bool is_steady = true;
+    static constexpr bool is_steady = true;
 
-  static time_point now() noexcept {
-    tms _internal;
-    times(&_internal);
-    return time_point(duration(std::make_tuple(
-        (_internal.tms_utime + _internal.tms_cutime)
-            * nanosec_per_tick(),
-        (_internal.tms_stime + _internal.tms_cstime)
-            * nanosec_per_tick(),
-        std::chrono::high_resolution_clock::now().time_since_epoch().count()
-        )));
-  }
-};
+    static time_point now() noexcept {
+      tms _internal;
+      times(&_internal);
+      return time_point(duration(std::make_tuple(
+          (_internal.tms_utime + _internal.tms_cutime)
+          * nanosec_per_tick(),
+          (_internal.tms_stime + _internal.tms_cstime)
+          * nanosec_per_tick(),
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::high_resolution_clock::now().time_since_epoch()).count()
+      )));
+    }
+  };
 
-}
+  template <typename Ratio>
+  struct ratiostr;
+
+  template<> struct ratiostr<std::pico>
+  { static constexpr const char *repr = "picosec"; };
+  template<> struct ratiostr<std::nano>
+  { static constexpr const char *repr = "nanosec"; };
+  template<> struct ratiostr<std::micro>
+  { static constexpr const char *repr = "microsec"; };
+  template<> struct ratiostr<std::milli>
+  { static constexpr const char *repr = "millisec"; };
+  template<> struct ratiostr<std::centi>
+  { static constexpr const char *repr = "centisec"; };
+  template<> struct ratiostr<std::deci>
+  { static constexpr const char *repr = "decisec"; };
+  template<> struct ratiostr<std::ratio<1>>
+  { static constexpr const char *repr = "sec"; };
+  template<> struct ratiostr<std::ratio<60>>
+  { static constexpr const char *repr = "min"; };
+  template<> struct ratiostr<std::ratio<3600>>
+  { static constexpr const char *repr = "hrs"; };
+
+} // namespace rlxutil
+
 
 namespace std
 {
@@ -217,9 +122,10 @@ namespace std
       const chrono::duration<rlxutil::combined_clock::rep,Period> &dur)
   {
     auto rep = dur.count();
-    return (strm << '(' << std::get<0>(rep) << ','
-        << std::get<1>(rep) << ','
-        << std::get<2>(rep) << ')');
+    return (strm << "[user "
+        << std::get<0>(rep) << ", system "
+        << std::get<1>(rep) << ", real "
+        << std::get<2>(rep) << ' ' << rlxutil::ratiostr<Period>::repr << ']');
   }
 
   inline constexpr rlxutil::combined_clock::duration
