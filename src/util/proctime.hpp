@@ -71,8 +71,8 @@ namespace rlxutil {
         result = -1;
       } else {
         result = Period::den / ::sysconf(_SC_CLK_TCK);
-        LOG(INFO) << "Clock ticks per "
-            << ratiostr<Period>::repr << ": " << result;
+        LOG(INFO) << "Number of "
+            << ratiostr<Period>::repr << " per clock tick: " << result;
       }
     }
     return result;
