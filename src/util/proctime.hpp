@@ -55,7 +55,7 @@ namespace rlxutil {
    * or nanoseconds, depending on the value of `Precision`)
    * that pass during one tick of the CPU clock.
    */
-  template <typename Period>
+  template <typename Precision>
   static std::intmax_t tickfactor() {
     static std::intmax_t result = 0;
     if (result == 0)
@@ -64,16 +64,14 @@ namespace rlxutil {
       if (result <= 0) {
         LOG(ERROR) << "Could not retrieve number of clock ticks per second (_SC_CLK_TCK).";
         result = -1;
-      } else if (result > Period::den) {
+      } else if (result > Precision::den) {
         LOG(ERROR) << "Found more than 1 clock tick per "
-            << ratiostr<Period>::repr
+            << ratiostr<Precision>::repr
             << ". rlxutil::cpu_clock can't handle that.";
         result = -1;
       } else {
-        LOG(INFO) << ::sysconf(_SC_CLK_TCK) << " ticks per sec";
-        result = Period::den / ::sysconf(_SC_CLK_TCK);
-        LOG(INFO) << "Number of "
-            << ratiostr<Period>::repr << " per clock tick: " << result;
+        result = Precision::den / ::sysconf(_SC_CLK_TCK);
+        LOG(INFO) << "1 tick is " << result << ' ' << ratiostr<Precision>::repr;
       }
     }
     return result;
