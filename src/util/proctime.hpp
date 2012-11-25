@@ -171,7 +171,7 @@ namespace std
      * on the same precision level.
      */
     template <typename Pr, typename Per>
-    inline constexpr duration<rlxutil::rep_combined_clock<Pr>,Per>
+    constexpr duration<rlxutil::rep_combined_clock<Pr>,Per>
     operator-(
         const time_point<rlxutil::combined_clock<Pr>,
                          duration<rlxutil::rep_combined_clock<Pr>,Per>> &lhs,
@@ -193,7 +193,7 @@ namespace std
      * will be used.
      */
     template <typename Pr1, typename Pr2, typename Per1, typename Per2>
-    inline constexpr duration<rlxutil::rep_combined_clock<Pr1>,Per1>
+    constexpr duration<rlxutil::rep_combined_clock<Pr1>,Per1>
     operator-(
         const time_point<rlxutil::combined_clock<Pr1>,
                          duration<rlxutil::rep_combined_clock<Pr1>,Per1>> &lhs,
@@ -250,7 +250,7 @@ namespace std
      *       << std::endl;
      *
      */
-    template <typename ToDur, typename Pr, typename Period> inline
+    template <typename ToDur, typename Pr, typename Period>
     constexpr duration<rlxutil::rep_combined_clock<Pr>,typename ToDur::period>
     duration_cast(const duration<rlxutil::rep_combined_clock<Pr>,Period> &dur)
     {
