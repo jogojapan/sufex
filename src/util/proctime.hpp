@@ -70,6 +70,7 @@ namespace rlxutil {
             << ". rlxutil::cpu_clock can't handle that.";
         result = -1;
       } else {
+        LOG(INFO) << ::sysconf(_SC_CLK_TCK) << " ticks per sec";
         result = Period::den / ::sysconf(_SC_CLK_TCK);
         LOG(INFO) << "Number of "
             << ratiostr<Period>::repr << " per clock tick: " << result;
