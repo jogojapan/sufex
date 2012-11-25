@@ -86,8 +86,8 @@ namespace rlxutil {
   {
     typedef Precision                             precision;
     typedef std::tuple<
-        std::clock_t,
-        std::clock_t,
+        std::intmax_t,
+        std::intmax_t,
         std::chrono::high_resolution_clock::rep>  rep;
 
     rep _d;
