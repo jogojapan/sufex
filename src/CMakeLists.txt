@@ -46,16 +46,26 @@ elseif (NOT Boost_FOUND)
 endif ()
 
 include("cmake/FindGlog.cmake")
+if (GLOG_FOUND)
+   include_directories(${GLOG_INCLUDE_DIRS})
+   link_directories (${GLOG_LIBRARY_DIR})
+elseif (NOT GLOG_FOUND)
+  message (FATAL_ERROR "Fatal error: google-glog required, but not found.\n")
+  message (STATUS "GLOG_PATH is $ENV{GLOG_PATH}. Try setting this environment variable to a different path.")
+endif ()
 
 add_executable (${bin_dir}/S2SParser s2s/S2SParser.cpp)
 add_executable (${bin_dir}/S2SFileParser s2s/S2SFileParser.cpp)
 add_executable (${bin_dir}/rulex rulex/rulex.cpp)
 target_link_libraries (${bin_dir}/S2SFileParser ${Boost_LIBRARIES})
 
+add_executable (${bin_dir}/combined_clock util/app/combined_clock.cpp)
+target_link_libraries (${bin_dir}/combined_clock ${Boost_LIBRARIES} ${GLOG_LIBRARY})
+
 enable_testing ()
 add_executable (${test_bin_dir}/S2SParserTest s2s/test/S2SParserTest.cpp)
 add_test (S2SParserTest ${test_bin_dir}/S2SParserTest)
 
 add_executable (${test_bin_dir}/SuxBuilderTrigramTest sux/test/SuxBuilderTrigramTest.cpp)
-target_link_libraries (${test_bin_dir}/SuxBuilderTrigramTest ${Boost_LIBRARIES})
+target_link_libraries (${test_bin_dir}/SuxBuilderTrigramTest ${Boost_LIBRARIES} ${GLOG_LIBRARY})
 add_test (SuxBuilderTrigramTest ${test_bin_dir}/SuxBuilderTrigramTest)

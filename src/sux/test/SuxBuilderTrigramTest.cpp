@@ -6,14 +6,14 @@
 
 #include "../sux.hpp"
 #include "../../util/random.hpp"
+#include "../../util/proctime.hpp"
 #include <iterator>
 #include <algorithm>
 #include <functional>
 #include <iostream>
 #include <iomanip>
 #include <chrono>
-#include <boost/chrono.hpp>
-#include "../../util/proctime.hpp"
+#include <ratio>
 
 using namespace std;
 
@@ -196,9 +196,6 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
 BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
 {
   /* Prepare for precise time measurements. */
-  typedef std::chrono::high_resolution_clock       Clock;
-  typedef boost::chrono::process_cpu_clock         CPUClock;
-  typedef boost::chrono::process_user_cpu_clock    UserCPUClock;
   typedef std::chrono::duration<double,std::milli> MS;
 
   /* Generate a random string of 40m characters. */
@@ -214,16 +211,11 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
   LTrigrams expected { actual };
 
   /* Trigam sort. */
-  auto real_tp1 = Clock::now();
-  auto cpu_tp1  = CPUClock::now();
-  auto user_tp1 = rlxutil::cpu_clock::now();
+  auto tp1 = rlxutil::combined_clock<std::micro>::now();
   LBuilder::sort_23trigrams(actual,4);
-  auto real_tp2 = Clock::now();
-  auto cpu_tp2  = CPUClock::now();
-  auto user_tp2 = rlxutil::cpu_clock::now();
+  auto tp2 = rlxutil::combined_clock<std::micro>::now();
   /* Alternative trigram sort, as reference. */
-  auto real_tp3 = Clock::now();
-  auto cpu_tp3  = CPUClock::now();
+  auto tp3 = rlxutil::combined_clock<std::micro>::now();
   std::stable_sort(std::begin(expected),std::end(expected),
       [](const LTrigram &tri1, const LTrigram &tri2) {
           return ((LBuilder::triget1(tri1) < LBuilder::triget1(tri2))
@@ -233,36 +225,19 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
                       && (LBuilder::triget2(tri1) == LBuilder::triget2(tri2))
                       && (LBuilder::triget3(tri1) < LBuilder::triget3(tri2))));
     });
-  auto real_tp4 = Clock::now();
-  auto cpu_tp4  = CPUClock::now();
+  auto tp4 = rlxutil::combined_clock<std::micro>::now();
 
-  typedef boost::chrono::duration<CPUClock::times,boost::chrono::nanoseconds::rep> cpu_nano_duration;
-  typedef boost::chrono::duration<CPUClock::times,boost::chrono::milliseconds::rep> cpu_milli_duration;
-
-  auto system_cpu_duration1 = cpu_tp2 - cpu_tp1;
-  auto cpu_duration2 = boost::chrono::process_cpu_clock_times(CPUClock::duration(cpu_tp4 - cpu_tp3).count());
+  auto duration_radix  = tp2 - tp1;
+  auto duration_stable = tp4 - tp3;
   /* Print time measurements. */
   cout << setw(18) << "Total trigrams:" << setw(10)
       << distance(begin(expected),end(expected)) << '\n'
-      << fixed << setprecision(3)
       << setw(18) << "Radix sort:" << setw(10)
-      << chrono::duration_cast<MS>(real_tp2 - real_tp1).count()
-      << " ms (CPU/user "
-      << chrono::duration_cast<MS>(user_tp2 - user_tp1).count()
-      << ", CPU/system "
-      << boost::chrono::duration_cast<boost::chrono::milliseconds>(system_cpu_duration1).count()
-      << " [" << system_cpu_duration1.count().system << "] "
-      << ")\n"
+      << chrono::duration_cast<MS>(duration_radix)
+      << '\n'
       << setw(18) << "Stable sort:" << setw(10)
-      << chrono::duration_cast<MS>(real_tp4 - real_tp3).count()
-      << " ms (CPU/user "
-      << boost::chrono::duration_cast<boost::chrono::milliseconds>(static_cast<boost::chrono::nanoseconds>(cpu_duration2.user))
-      << " [" << cpu_duration2.user << "] "
-      << ", CPU/system "
-      << boost::chrono::duration_cast<boost::chrono::milliseconds>(static_cast<boost::chrono::nanoseconds>(cpu_duration2.system))
-      << " [" << cpu_duration2.system << "] "
-      << ")"
-      << endl;
+      << chrono::duration_cast<MS>(duration_stable)
+      << ')' << endl;
 
   /* Check for equality of the two results. */
   BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));

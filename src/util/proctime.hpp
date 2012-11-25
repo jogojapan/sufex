@@ -23,53 +23,6 @@
 
 namespace rlxutil {
 
-  static std::intmax_t nanosec_per_tick() {
-    static std::intmax_t result = 0;
-    if (result == 0)
-    {
-      result = ::sysconf(_SC_CLK_TCK);
-      if (result <= 0) {
-        LOG(ERROR) << "Could not retrieve number of clock ticks per second (_SC_CLK_TCK).";
-        result = -1;
-      } else if (result > std::nano::den) {
-        LOG(ERROR) << "Found more than 1 clock tick per nanosecond. "
-            << "rlxutil::cpu_clock can't handle that.";
-        result = -1;
-      } else {
-        result = std::nano::den / ::sysconf(_SC_CLK_TCK);
-        LOG(INFO) << "Clock ticks per nanosecond: " << result;
-      }
-    }
-    return result;
-  }
-
-  class combined_clock
-  {
-  public:
-    typedef std::tuple<
-        std::clock_t,
-        std::clock_t,
-        std::chrono::high_resolution_clock::rep>             rep;
-    typedef std::nano                                        period;
-    typedef std::chrono::duration<rep,period>                duration;
-    typedef std::chrono::time_point<combined_clock,duration> time_point;
-
-    static constexpr bool is_steady = true;
-
-    static time_point now() noexcept {
-      tms _internal;
-      times(&_internal);
-      return time_point(duration(std::make_tuple(
-          (_internal.tms_utime + _internal.tms_cutime)
-          * nanosec_per_tick(),
-          (_internal.tms_stime + _internal.tms_cstime)
-          * nanosec_per_tick(),
-          std::chrono::duration_cast<std::chrono::nanoseconds>(
-              std::chrono::high_resolution_clock::now().time_since_epoch()).count()
-      )));
-    }
-  };
-
   template <typename Ratio>
   struct ratiostr;
 
@@ -92,38 +45,108 @@ namespace rlxutil {
   template<> struct ratiostr<std::ratio<3600>>
   { static constexpr const char *repr = "hrs"; };
 
+
+  template <typename Period>
+  static std::intmax_t tickfactor() {
+    static std::intmax_t result = 0;
+    if (result == 0)
+    {
+      result = ::sysconf(_SC_CLK_TCK);
+      if (result <= 0) {
+        LOG(ERROR) << "Could not retrieve number of clock ticks per second (_SC_CLK_TCK).";
+        result = -1;
+      } else if (result > Period::den) {
+        LOG(ERROR) << "Found more than 1 clock tick per "
+            << ratiostr<Period>::repr
+            << ". rlxutil::cpu_clock can't handle that.";
+        result = -1;
+      } else {
+        result = Period::den / ::sysconf(_SC_CLK_TCK);
+        LOG(INFO) << "Clock ticks per "
+            << ratiostr<Period>::repr << ": " << result;
+      }
+    }
+    return result;
+  }
+
+  template <typename Precision>
+  struct rep_combined_clock
+  {
+    typedef Precision                             precision;
+    typedef std::tuple<
+        std::clock_t,
+        std::clock_t,
+        std::chrono::high_resolution_clock::rep>  rep;
+
+    rep _d;
+  };
+
+  template <typename Precision>
+  class combined_clock
+  {
+    static_assert(std::chrono::__is_ratio<Precision>::value,
+        "Precision must be a std::ratio");
+  public:
+    typedef rep_combined_clock<Precision>                    rep;
+    typedef Precision                                        period;
+    typedef std::chrono::duration<rep,period>                duration;
+    typedef std::chrono::time_point<combined_clock,duration> time_point;
+
+    static constexpr bool is_steady = true;
+
+    static time_point now() noexcept
+    {
+      typedef std::chrono::high_resolution_clock hires;
+      tms _internal;
+      ::times(&_internal);
+      return time_point(duration(
+          rep { std::make_tuple(
+              (_internal.tms_utime + _internal.tms_cutime)
+                * tickfactor<period>(),
+              (_internal.tms_stime + _internal.tms_cstime)
+                * tickfactor<period>(),
+              std::chrono::duration_cast<std::chrono::duration<hires::rep,period>>(
+                  hires::now().time_since_epoch()).count()
+          )}
+      ));
+    }
+  };
+
 } // namespace rlxutil
 
 
 namespace std
 {
 
-  template <typename Period>
+  template <typename Precision, typename Period>
   std::ostream &operator<<(
       std::ostream &strm,
-      const chrono::duration<rlxutil::combined_clock::rep,Period> &dur)
+      const chrono::duration<rlxutil::rep_combined_clock<Precision>,Period> &dur)
   {
     auto rep = dur.count();
     return (strm << "[user "
-        << std::get<0>(rep) << ", system "
-        << std::get<1>(rep) << ", real "
-        << std::get<2>(rep) << ' ' << rlxutil::ratiostr<Period>::repr << ']');
-  }
-
-  inline constexpr rlxutil::combined_clock::duration
-  operator-(
-      const rlxutil::combined_clock::duration &lhs,
-      const rlxutil::combined_clock::duration &rhs)
-  {
-    typedef rlxutil::combined_clock::duration duration;
-    return duration(std::make_tuple(
-        std::get<0>(lhs.count()) - std::get<0>(rhs.count()),
-        std::get<1>(lhs.count()) - std::get<1>(rhs.count()),
-        std::get<2>(lhs.count()) - std::get<2>(rhs.count())));
+        << std::get<0>(rep._d) << ", system "
+        << std::get<1>(rep._d) << ", real "
+        << std::get<2>(rep._d) << ' ' << rlxutil::ratiostr<Period>::repr << ']');
   }
 
   namespace chrono
   {
+
+    template <typename Precision, typename Period>
+    inline constexpr duration<rlxutil::rep_combined_clock<Precision>,Period>
+    operator-(
+        const time_point<rlxutil::combined_clock<Precision>,
+                         duration<rlxutil::rep_combined_clock<Precision>,Period>> &lhs,
+        const time_point<rlxutil::combined_clock<Precision>,
+                         duration<rlxutil::rep_combined_clock<Precision>,Period>> &rhs)
+    {
+      typedef duration<rlxutil::rep_combined_clock<Precision>,Period> dur;
+      return dur(rlxutil::rep_combined_clock<Precision> { std::make_tuple(
+          std::get<0>(lhs.time_since_epoch().count()._d) - std::get<0>(rhs.time_since_epoch().count()._d),
+          std::get<1>(lhs.time_since_epoch().count()._d) - std::get<1>(rhs.time_since_epoch().count()._d),
+          std::get<2>(lhs.time_since_epoch().count()._d) - std::get<2>(rhs.time_since_epoch().count()._d)) });
+    }
 
     template <typename FromPeriod, typename ToDur>
     struct tuple_duration_element
@@ -136,14 +159,16 @@ namespace std
       };
     };
 
-    template <typename ToDur, typename Period> inline
-    constexpr duration<rlxutil::combined_clock::rep,typename ToDur::period>
-    duration_cast(const duration<rlxutil::combined_clock::rep,Period> &dur)
+    template <typename ToDur, typename Pr, typename Period> inline
+    constexpr duration<rlxutil::rep_combined_clock<Pr>,typename ToDur::period>
+    duration_cast(const duration<rlxutil::rep_combined_clock<Pr>,Period> &dur)
     {
-      return duration<rlxutil::combined_clock::rep,typename ToDur::period>(
-          rlxutil::tuple::template_map<tuple_duration_element<Period,ToDur>::template caster>(
-              dur.count())
-      );
+      return duration<rlxutil::rep_combined_clock<Pr>,typename ToDur::period>(
+          rlxutil::rep_combined_clock<Pr>
+      {
+        rlxutil::tuple::template_map<tuple_duration_element<Period,ToDur>::template caster>(
+              dur.count()._d)
+      });
     }
 
   }

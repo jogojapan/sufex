@@ -103,7 +103,8 @@ if(MSVC)
     string(REGEX REPLACE "/libglog.lib" "" GLOG_LIBRARY_DIR ${GLOG_LIBRARY})
 else(MSVC)
 	# Linux/OS X builds
-    set(GLOG_INCLUDE_DIRS ${GLOG_INCLUDE_DIR})
+    string(REGEX REPLACE "/glog$" "" VAR_WITHOUT ${GLOG_INCLUDE_DIR})
+    set(GLOG_INCLUDE_DIRS ${GLOG_INCLUDE_DIRS} "${VAR_WITHOUT}")
     string(REGEX REPLACE "/libglog.so" "" GLOG_LIBRARY_DIR ${GLOG_LIBRARY})
 endif(MSVC)
 
