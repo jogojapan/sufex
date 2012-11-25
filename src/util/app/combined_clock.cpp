@@ -22,7 +22,7 @@ int main(int /*argc*/, char *argv[])
 
   unsigned long step1 = 1;
   unsigned long step2 = 1;
-  for (int i = 0 ; i < 10000000 ; ++i) {
+  for (int i = 0 ; i < 50000000 ; ++i) {
     unsigned long step3 = step1 + step2;
     std::swap(step1,step2);
     std::swap(step2,step3);
