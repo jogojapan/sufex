@@ -113,6 +113,25 @@ namespace sux {
         (get3() == other.get3())); }
   };
 
+  /**
+   * Return the first character of a trigram, regardless of the implementation
+   * of the trigram.
+   */
+  template <typename TrigramT>
+  static typename TrigramT::char_type triget1(const TrigramT &tri) { return tri.get1(); }
+  /**
+   * Return the second character of a trigram, regardless of the implementation
+   * of the trigram.
+   */
+  template <typename TrigramT>
+  static typename TrigramT::char_type triget2(const TrigramT &tri) { return tri.get2(); }
+  /**
+   * Return the third character of a trigram, regardless of the implementation
+   * of the trigram.
+   */
+  template <typename TrigramT>
+  static typename TrigramT::char_type triget3(const TrigramT &tri) { return tri.get3(); }
+
   template <TGImpl tgimpl, typename Char, typename Pos>
   struct SuxBuilder
   {
@@ -207,13 +226,6 @@ namespace sux {
     typedef TrigramImpl<tgimpl,Char,Pos> Trigram;
     typedef std::vector<Trigram>         Trigrams;
 
-    template <typename TrigramT>
-    static Char triget1(const TrigramT &tri) { return tri.get1(); }
-    template <typename TrigramT>
-    static Char triget2(const TrigramT &tri) { return tri.get2(); }
-    template <typename TrigramT>
-    static Char triget3(const TrigramT &tri) { return tri.get3(); }
-
     /**
      * Generate a list of trigrams starting at positions not divisible by 3.
      * Each trigram is represented as a tuple <pos,char1,char2,char3>.
@@ -263,7 +275,7 @@ namespace sux {
     static void sort_23trigrams(std::vector<Elem> &trigrams)
     {
       /* Extractor function for the third character of every trigram. */
-      auto extractor3 = [](const Trigram &trigram) { return SuxBuilder::triget3(trigram); };
+      auto extractor3 = [](const Trigram &trigram) { return triget3(trigram); };
       /* Determine the alphabet and distribution of trigram-final characters. */
       CharDistribution bucket_sizes {
         accumulated_charcounts(begin(trigrams),end(trigrams),extractor3)
@@ -274,13 +286,13 @@ namespace sux {
       bucket_sort(begin(trigrams),end(trigrams),extractor3,bucket_sizes,temp_vec);
       std::swap(trigrams,temp_vec);
       /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor2 = [](const Trigram &trigram) { return SuxBuilder::triget2(trigram); };
+      auto extractor2 = [](const Trigram &trigram) { return triget2(trigram); };
       bucket_sizes = accumulated_charcounts(
           std::begin(trigrams),std::end(trigrams),extractor2);
       bucket_sort(begin(trigrams),end(trigrams),extractor2,bucket_sizes,temp_vec);
       std::swap(trigrams,temp_vec);
       /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor1 = [](const Trigram &trigram) { return SuxBuilder::triget1(trigram); };
+      auto extractor1 = [](const Trigram &trigram) { return triget1(trigram); };
       bucket_sizes = accumulated_charcounts(begin(trigrams),end(trigrams),extractor1);
       bucket_sort(begin(trigrams),end(trigrams),extractor1,bucket_sizes,temp_vec);
       std::swap(trigrams,temp_vec);
@@ -467,34 +479,8 @@ namespace sux {
       return accumulated_charcounts(from,to,cid<typename std::iterator_traits<Iterator>::value_type>);
     }
 
-    /**
-     * Perform a bucket-sort of the elements in the range [from,to), using the
-     * given extractor to determine the sorting criterion. The result will
-     * be sorted into to_vec. to_vec must be resize()'ed by the caller
-     * before the call. bucket_sizes must be prepared by the caller so it
-     * provides the size of each bucket.
-     */
-    template <typename Iterator, typename CharExtractor, typename Elem>
-    static void bucket_sort(
-        Iterator           from,
-        Iterator           to,
-        CharExtractor      extractor,
-        CharDistribution  &bucket_sizes,
-        std::vector<Elem> &to_vec)
-    {
-      while (from != to)
-      {
-        to_vec[bucket_sizes[extractor(*from)]++] = *from;
-        ++from;
-      }
-    }
-
     typedef TrigramImpl<TGImpl::pointer,Char,Pos> Trigram;
     typedef std::vector<Trigram>                  Trigrams;
-
-    static Char triget1(const Trigram &tri) { return tri.get1(); }
-    static Char triget2(const Trigram &tri) { return tri.get2(); }
-    static Char triget3(const Trigram &tri) { return tri.get3(); }
 
     /**
      * Generate a list of trigrams starting at positions not divisible by 3.

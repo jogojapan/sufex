@@ -224,12 +224,12 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
   auto tp3 = rlxutil::combined_clock<std::micro>::now();
   std::stable_sort(std::begin(expected),std::end(expected),
       [](const LTrigram &tri1, const LTrigram &tri2) {
-          return ((LBuilder::triget1(tri1) < LBuilder::triget1(tri2))
-                  || ((LBuilder::triget1(tri1) == LBuilder::triget1(tri2))
-                      && (LBuilder::triget2(tri1) < LBuilder::triget2(tri2)))
-                  || ((LBuilder::triget1(tri1) == LBuilder::triget1(tri2))
-                      && (LBuilder::triget2(tri1) == LBuilder::triget2(tri2))
-                      && (LBuilder::triget3(tri1) < LBuilder::triget3(tri2))));
+          return ((sux::triget1(tri1) < sux::triget1(tri2))
+                  || ((sux::triget1(tri1) == sux::triget1(tri2))
+                      && (sux::triget2(tri1) < sux::triget2(tri2)))
+                  || ((sux::triget1(tri1) == sux::triget1(tri2))
+                      && (sux::triget2(tri1) == sux::triget2(tri2))
+                      && (sux::triget3(tri1) < sux::triget3(tri2))));
     });
   auto tp4 = rlxutil::combined_clock<std::micro>::now();
 
@@ -239,11 +239,9 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
   cout << setw(18) << "Total trigrams:" << setw(10)
       << distance(begin(expected),end(expected)) << '\n'
       << setw(18) << "Radix sort:" << setw(10)
-      << chrono::duration_cast<MS>(duration_radix)
-      << '\n'
+      << chrono::duration_cast<MS>(duration_radix) << '\n'
       << setw(18) << "Stable sort:" << setw(10)
-      << chrono::duration_cast<MS>(duration_stable)
-      << ')' << endl;
+      << chrono::duration_cast<MS>(duration_stable) << endl;
 
   /* Check for equality of the two results. */
   BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
@@ -272,14 +270,14 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test4)
   auto tp2 = rlxutil::combined_clock<std::micro>::now();
   /* Alternative trigram sort, as reference. */
   auto tp3 = rlxutil::combined_clock<std::micro>::now();
-   std::stable_sort(std::begin(expected),std::end(expected),
+  std::stable_sort(std::begin(expected),std::end(expected),
       [](const LPTrigram &tri1, const LPTrigram &tri2) {
-          return ((LPBuilder::triget1(tri1) < LPBuilder::triget1(tri2))
-                  || ((LPBuilder::triget1(tri1) == LPBuilder::triget1(tri2))
-                      && (LPBuilder::triget2(tri1) < LPBuilder::triget2(tri2)))
-                  || ((LPBuilder::triget1(tri1) == LPBuilder::triget1(tri2))
-                      && (LPBuilder::triget2(tri1) == LPBuilder::triget2(tri2))
-                      && (LPBuilder::triget3(tri1) < LPBuilder::triget3(tri2))));
+          return ((sux::triget1(tri1) < sux::triget1(tri2))
+                  || ((sux::triget1(tri1) == sux::triget1(tri2))
+                      && (sux::triget2(tri1) < sux::triget2(tri2)))
+                  || ((sux::triget1(tri1) == sux::triget1(tri2))
+                      && (sux::triget2(tri1) == sux::triget2(tri2))
+                      && (sux::triget3(tri1) < sux::triget3(tri2))));
     });
   auto tp4 = rlxutil::combined_clock<std::micro>::now();
 
@@ -289,11 +287,9 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test4)
   cout << setw(18) << "Total trigrams:" << setw(10)
       << distance(begin(expected),end(expected)) << '\n'
       << setw(18) << "Radix sort:" << setw(10)
-      << chrono::duration_cast<MS>(duration_radix)
-      << '\n'
+      << chrono::duration_cast<MS>(duration_radix) << '\n'
       << setw(18) << "Stable sort:" << setw(10)
-      << chrono::duration_cast<MS>(duration_stable)
-      << ')' << endl;
+      << chrono::duration_cast<MS>(duration_stable) << endl;
 
   /* Check for equality of the two results. */
   BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
