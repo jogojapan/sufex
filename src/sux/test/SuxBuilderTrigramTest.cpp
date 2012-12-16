@@ -33,6 +33,12 @@ typedef LBuilder::Trigrams         LTrigrams;
 typedef LBuilder::CharFrequency    LCharFrequency;
 typedef LBuilder::CharDistribution LCharDistribution;
 
+typedef sux::SuxBuilder<sux::TGImpl::pointer,Char,LPos> LPBuilder;
+typedef LPBuilder::Trigram          LPTrigram;
+typedef LPBuilder::Trigrams         LPTrigrams;
+typedef LPBuilder::CharFrequency    LPCharFrequency;
+typedef LPBuilder::CharDistribution LPCharDistribution;
+
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_3)
 {
   const std::basic_string<Char> input { (const Char *)"abc" };
@@ -224,6 +230,56 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
                   || ((LBuilder::triget1(tri1) == LBuilder::triget1(tri2))
                       && (LBuilder::triget2(tri1) == LBuilder::triget2(tri2))
                       && (LBuilder::triget3(tri1) < LBuilder::triget3(tri2))));
+    });
+  auto tp4 = rlxutil::combined_clock<std::micro>::now();
+
+  auto duration_radix  = tp2 - tp1;
+  auto duration_stable = tp4 - tp3;
+  /* Print time measurements. */
+  cout << setw(18) << "Total trigrams:" << setw(10)
+      << distance(begin(expected),end(expected)) << '\n'
+      << setw(18) << "Radix sort:" << setw(10)
+      << chrono::duration_cast<MS>(duration_radix)
+      << '\n'
+      << setw(18) << "Stable sort:" << setw(10)
+      << chrono::duration_cast<MS>(duration_stable)
+      << ')' << endl;
+
+  /* Check for equality of the two results. */
+  BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test4)
+{
+  /* Prepare for precise time measurements. */
+  typedef std::chrono::duration<double,std::milli> MS;
+
+  /* Generate a random string of 40m characters. */
+  constexpr std::size_t N = 40 * 1024 * 1024;
+  std::basic_string<Char> input;
+  input.resize(N);
+  std::generate_n(begin(input),N,
+      rlxutil::RandomSequenceGeneratorUniform<Char>(' ','z'));
+
+  /* Generate trigrams. */
+  LPTrigrams actual = LPBuilder::make_23trigrams(begin(input),end(input));
+  /* Make a copy of the trigrams, which will later be sorted them separately. */
+  LPTrigrams expected { actual };
+
+  /* Trigam sort. */
+  auto tp1 = rlxutil::combined_clock<std::micro>::now();
+  LBuilder::sort_23trigrams(actual,4);
+  auto tp2 = rlxutil::combined_clock<std::micro>::now();
+  /* Alternative trigram sort, as reference. */
+  auto tp3 = rlxutil::combined_clock<std::micro>::now();
+   std::stable_sort(std::begin(expected),std::end(expected),
+      [](const LPTrigram &tri1, const LPTrigram &tri2) {
+          return ((LPBuilder::triget1(tri1) < LPBuilder::triget1(tri2))
+                  || ((LPBuilder::triget1(tri1) == LPBuilder::triget1(tri2))
+                      && (LPBuilder::triget2(tri1) < LPBuilder::triget2(tri2)))
+                  || ((LPBuilder::triget1(tri1) == LPBuilder::triget1(tri2))
+                      && (LPBuilder::triget2(tri1) == LPBuilder::triget2(tri2))
+                      && (LPBuilder::triget3(tri1) < LPBuilder::triget3(tri2))));
     });
   auto tp4 = rlxutil::combined_clock<std::micro>::now();
 

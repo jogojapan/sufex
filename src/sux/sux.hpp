@@ -30,7 +30,7 @@ namespace sux {
   inline const T& cid(const T& t) { return t; }
 
   /** Implementation of trigrams. */
-  enum class TGImpl { tuple, arraytuple, structure };
+  enum class TGImpl { tuple, arraytuple, structure, pointer };
 
   template <TGImpl tgimpl, typename Char, typename Pos>
   struct TrigramImpl;
@@ -41,6 +41,7 @@ namespace sux {
     typedef std::tuple<Pos,Char,Char,Char> base_type;
     typedef Char                           char_type;
     typedef std::vector<TrigramImpl>       vec_type;
+    constexpr static TGImpl                impl = TGImpl::tuple;
   
     TrigramImpl():base_type() {}
 
@@ -57,13 +58,14 @@ namespace sux {
     Char get3() const { return std::get<3>(*this); }
   };
   
-  /** `char` implementation of trigrams. */
+  /** Array-based implementation of trigrams. */
   template <typename Char, typename Pos>
   struct TrigramImpl<TGImpl::arraytuple,Char,Pos> : public std::tuple<Pos,std::array<Char,3>>
   {
     typedef std::tuple<Pos,std::array<Char,3>> base_type;
     typedef Char                               char_type;
     typedef std::vector<TrigramImpl>           vec_type;
+    constexpr static TGImpl                    impl = TGImpl::arraytuple;
 
     TrigramImpl():base_type() {}
 
@@ -80,27 +82,36 @@ namespace sux {
     char_type get3() const { return std::get<1>(*this)[2]; }
   };
 
-//  template <typename Pos>
-//  struct TrigramImpl<unsigned char,Pos> : public std::tuple<Pos,std::array<unsigned char,3>>
-//  {
-//    typedef std::tuple<Pos,std::array<unsigned char,3>> base_type;
-//    typedef unsigned char                               char_type;
-//    typedef std::vector<TrigramImpl>                    vec_type;
-//
-//    TrigramImpl():base_type() {}
-//
-//    TrigramImpl(
-//        const Pos pos,
-//        const unsigned char c1,
-//        const unsigned char c2,
-//        const unsigned char c3)
-//    :base_type(pos,{{c1,c2,c3}})
-//    {}
-//
-//    char_type get1() const { return std::get<1>(*this)[0]; }
-//    char_type get2() const { return std::get<1>(*this)[1]; }
-//    char_type get3() const { return std::get<1>(*this)[2]; }
-//  };
+  /** Pointer-based implementation of trigrams. */
+  template <typename Char, typename Pos>
+  struct TrigramImpl<TGImpl::pointer,Char,Pos>
+  {
+    typedef Char *                   base_type;
+    typedef Char                     char_type;
+    typedef std::vector<TrigramImpl> vec_type;
+    constexpr static TGImpl          impl = TGImpl::pointer;
+
+    const Char *_p;
+
+    TrigramImpl()
+    : _p()
+    { }
+
+    TrigramImpl(
+        const Char *cp)
+    : _p(cp)
+    { }
+
+    char_type get1() const { return *_p; }
+    char_type get2() const { return *(_p+1); }
+    char_type get3() const { return *(_p+2); }
+
+    bool operator==(const TrigramImpl &other) const
+    { return (
+        (get1() == other.get1()) &&
+        (get2() == other.get2()) &&
+        (get3() == other.get3())); }
+  };
 
   template <TGImpl tgimpl, typename Char, typename Pos>
   struct SuxBuilder
@@ -196,9 +207,12 @@ namespace sux {
     typedef TrigramImpl<tgimpl,Char,Pos> Trigram;
     typedef std::vector<Trigram>         Trigrams;
 
-    static Char triget1(const Trigram &tri) { return tri.get1(); }
-    static Char triget2(const Trigram &tri) { return tri.get2(); }
-    static Char triget3(const Trigram &tri) { return tri.get3(); }
+    template <typename TrigramT>
+    static Char triget1(const TrigramT &tri) { return tri.get1(); }
+    template <typename TrigramT>
+    static Char triget2(const TrigramT &tri) { return tri.get2(); }
+    template <typename TrigramT>
+    static Char triget3(const TrigramT &tri) { return tri.get3(); }
 
     /**
      * Generate a list of trigrams starting at positions not divisible by 3.
@@ -372,14 +386,148 @@ namespace sux {
       /* Vector for intermediate results. */
       std::vector<TrigramType> temp_vec(trigrams.size());
       /* First pass. */
-      sort_23trigrams_one_pass(trigrams,temp_vec,triget3,threads);
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget3<TrigramType>,threads);
       swap(trigrams,temp_vec);
       /* Second pass. */
-      sort_23trigrams_one_pass(trigrams,temp_vec,triget2,threads);
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget2<TrigramType>,threads);
       swap(trigrams,temp_vec);
       /* Third pass. */
-      sort_23trigrams_one_pass(trigrams,temp_vec,triget1,threads);
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget1<TrigramType>,threads);
       swap(trigrams,temp_vec);
+    }
+
+  };
+
+  template <typename Char, typename Pos>
+  struct SuxBuilder<TGImpl::pointer,Char,Pos>
+  {
+    typedef std::pair<Char,Pos>  CharFrequency;
+    typedef std::map<Char,Pos>   CharDistribution;
+
+    /**
+     * Generate frequency table for the text [from,to).
+     */
+    template <typename Iterator, typename CharExtractor, typename Mapping = CharDistribution>
+    static Mapping generate_freq_table(Iterator from, Iterator to, CharExtractor extractor)
+    {
+      Mapping freq_table {};
+      std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
+        ++freq_table[extractor(elem)];
+      });
+      return freq_table;
+    }
+
+    /**
+     * Transform a character frequency table into an accumulated
+     * frequency table, in-place.
+     *
+     * The Mapping data type may be any data type that provides a
+     * default iterator that dereferences to CharFrequency.
+     */
+    template <typename Mapping>
+    static void accumulate_frequencies(Mapping &freq_table)
+    {
+      Pos total {};
+      for (auto &cf : freq_table) {
+        std::swap(total,cf.second);
+        total += cf.second;
+      }
+    }
+
+    /**
+     * Determine the alphabet of characters used in a sequence, count the number
+     * of occurrences of each, and provide accumulated counts. The result is an
+     * ordered map from char to accumulated-count. The accumulated count
+     * if the sum of the counts of all previous characters, NOT including the
+     * present character itself. The order of characters is the one defined by the
+     * ordering of the map (std::less<Char> by default).
+     * The datatype used to represent frequency values is Pos.
+     *
+     * The CharExtractor should be a function type. It is applied to every element of
+     * the sequence to extract a character from it.
+     */
+    template <typename Iterator, typename CharExtractor>
+    static CharDistribution accumulated_charcounts(Iterator from, Iterator to, CharExtractor extractor)
+    {
+      /* Count character frequencies. */
+      CharDistribution freq_table { generate_freq_table(from,to,extractor) };
+      /* Generate accumulated distribution. */
+      accumulate_frequencies(freq_table);
+      /* Return results. */
+      return freq_table;
+    }
+
+    /**
+     * Version of <code>determine_chardistribution()</code> that uses const identity as
+     * char-extractor, i.e. it assumes the input sequence is a sequence of characters.
+     */
+    template <typename Iterator>
+    static CharDistribution accumulated_charcounts(Iterator from, Iterator to)
+    {
+      return accumulated_charcounts(from,to,cid<typename std::iterator_traits<Iterator>::value_type>);
+    }
+
+    /**
+     * Perform a bucket-sort of the elements in the range [from,to), using the
+     * given extractor to determine the sorting criterion. The result will
+     * be sorted into to_vec. to_vec must be resize()'ed by the caller
+     * before the call. bucket_sizes must be prepared by the caller so it
+     * provides the size of each bucket.
+     */
+    template <typename Iterator, typename CharExtractor, typename Elem>
+    static void bucket_sort(
+        Iterator           from,
+        Iterator           to,
+        CharExtractor      extractor,
+        CharDistribution  &bucket_sizes,
+        std::vector<Elem> &to_vec)
+    {
+      while (from != to)
+      {
+        to_vec[bucket_sizes[extractor(*from)]++] = *from;
+        ++from;
+      }
+    }
+
+    typedef TrigramImpl<TGImpl::pointer,Char,Pos> Trigram;
+    typedef std::vector<Trigram>                  Trigrams;
+
+    static Char triget1(const Trigram &tri) { return tri.get1(); }
+    static Char triget2(const Trigram &tri) { return tri.get2(); }
+    static Char triget3(const Trigram &tri) { return tri.get3(); }
+
+    /**
+     * Generate a list of trigrams starting at positions not divisible by 3.
+     * Each trigram is represented as a tuple <pos,char1,char2,char3>.
+     * Only complete trigrams are included.
+     */
+    template <typename Iterator>
+    static Trigrams make_23trigrams(Iterator from, Iterator to)
+    {
+      Trigrams result;
+      while (std::distance(from,to) >= 5)
+      {
+        /* Position 0, skip. */
+        ++from;
+        /* Position 1, copy. */
+        result.emplace_back(&*from);
+        ++from;
+        /* Position 2, copy. */
+        result.emplace_back(&*from);
+        /* Next iteration. */
+        ++from;
+      }
+      if (std::distance(from,to) == 4)
+      {
+        /* Position 0, skip. */
+        ++from;
+        /* Position 1, copy. */
+        result.emplace_back(&*from);
+        /* Position 2, no complete trigram available. Skip two. */
+        from += 2;
+      }
+
+      return result;
     }
 
   };

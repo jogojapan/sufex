@@ -101,8 +101,8 @@
 							<tool id="cdt.managedbuild.tool.gnu.archiver.base.467898242" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.base"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.base.1058130475" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.base">
 								<option id="gnu.cpp.compiler.option.include.paths.746459542" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/space/software/boost_1_50_0/include"/>
 									<listOptionValue builtIn="false" value="/space/software/gcc-4.7.2/include/c++/4.7.2"/>
+									<listOptionValue builtIn="false" value="/space/software/boost_1_50_0/include"/>
 									<listOptionValue builtIn="false" value="/space/software/glog-0.3.2/include"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.993053135" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
@@ -145,6 +145,7 @@
 			<resource resourceType="PROJECT" workspacePath="/sufex"/>
 		</configuration>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1581703132;cdt.managedbuild.toolchain.gnu.base.1581703132.1245842454;cdt.managedbuild.tool.gnu.cpp.compiler.base.1757422527;cdt.managedbuild.tool.gnu.cpp.compiler.input.691570900">
@@ -163,9 +164,6 @@
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.919013407.1360123434;cdt.managedbuild.toolchain.gnu.base.919013407.1360123434.;cdt.managedbuild.tool.gnu.c.compiler.base.649040711;cdt.managedbuild.tool.gnu.c.compiler.input.308168085">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.919013407;cdt.managedbuild.toolchain.gnu.base.919013407.203077955;cdt.managedbuild.tool.gnu.c.compiler.base.1795393647;cdt.managedbuild.tool.gnu.c.compiler.input.1956080237">
-			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.919013407;cdt.managedbuild.toolchain.gnu.base.919013407.203077955;cdt.managedbuild.tool.gnu.cpp.compiler.base.261732028;cdt.managedbuild.tool.gnu.cpp.compiler.input.581687297">
 			<autodiscovery enabled="false" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.make.core.GCCStandardMakePerFileProfile"/>
 			<profile id="org.eclipse.cdt.make.core.GCCStandardMakePerFileProfile">
@@ -178,6 +176,9 @@
 					<parser enabled="false"/>
 				</scannerInfoProvider>
 			</profile>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.919013407;cdt.managedbuild.toolchain.gnu.base.919013407.203077955;cdt.managedbuild.tool.gnu.c.compiler.base.1795393647;cdt.managedbuild.tool.gnu.c.compiler.input.1956080237">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1581703132;cdt.managedbuild.toolchain.gnu.base.1581703132.1245842454;cdt.managedbuild.tool.gnu.c.compiler.base.2058018141;cdt.managedbuild.tool.gnu.c.compiler.input.64442345">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileC"/>
@@ -196,5 +197,4 @@
 			</profile>
 		</scannerConfigBuildInfo>
 	</storageModule>
-	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cproject>
