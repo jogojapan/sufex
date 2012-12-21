@@ -13,7 +13,7 @@
 #include <ratio>
 #include <glog/logging.h>
 
-#include "../sux.hpp"
+#include "../trigram.hpp"
 #include "../../util/random.hpp"
 #include "../../util/proctime.hpp"
 

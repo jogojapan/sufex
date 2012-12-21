@@ -30,13 +30,13 @@
 # (To distribute this file outside of CMake, substitute the full
 #  License text for the above reference.)
 
-if (NOT DEFINED GLOG_ROOT)
-  if ($ENV{GLOG_PATH} STREQUAL "")
+IF (NOT DEFINED GLOG_ROOT)
+  IF (NOT DEFINED ENV{GLOG_PATH})
     set (GLOG_ROOT /usr /usr/local)
-  else ($ENV{GLOG_PATH} STREQUAL "")
+  ELSE ()
     set (GLOG_ROOT  $ENV{GLOG_PATH})
-  endif ($ENV{GLOG_PATH} STREQUAL "")
-endif (NOT DEFINED GLOG_ROOT)
+  ENDIF ()
+ENDIF (NOT DEFINED GLOG_ROOT)
 
 message("GLOG_ROOT = " ${GLOG_ROOT})
 
