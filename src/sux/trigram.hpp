@@ -120,6 +120,10 @@ namespace sux {
         (get3() == other.get3())); }
   };
 
+  template <TGImpl tgimpl, typename Char, typename Pos>
+  const char *tgimpl_of(const TrigramImpl<tgimpl,Char,Pos> &)
+  { return repr<tgimpl>::str; }
+
   /**
    * Return the first character of a trigram, regardless of the implementation
    * of the trigram.
@@ -139,11 +143,14 @@ namespace sux {
   template <typename TrigramT>
   static typename TrigramT::char_type triget3(const TrigramT &tri) { return tri.get3(); }
 
+  /** The container type for trigram lists. */
+  template <typename TrigramT> struct TrigramContainer { typedef std::vector<TrigramT> vec_type; };
+
   template <TGImpl tgimpl, typename Char, typename Pos>
   struct TrigramMaker
   {
-    typedef TrigramImpl<tgimpl,Char,Pos> Trigram;
-    typedef std::vector<Trigram>         Trigrams;
+    typedef TrigramImpl<tgimpl,Char,Pos>                      trigram_type;
+    typedef typename TrigramContainer<trigram_type>::vec_type trigram_vec_type;
 
     /**
      * Generate a list of trigrams starting at positions not divisible by 3.
@@ -151,10 +158,10 @@ namespace sux {
      * Only complete trigrams are included.
      */
     template <typename Iterator>
-    static Trigrams make_23trigrams(Iterator from, Iterator to)
+    static trigram_vec_type make_23trigrams(Iterator from, Iterator to)
     {
       short pos { 0 };
-      Trigrams result;
+      trigram_vec_type result;
       while (std::distance(from,to) >= 5)
       {
         /* Position 0, skip. */
@@ -195,8 +202,8 @@ namespace sux {
   template <typename Char, typename Pos>
   struct TrigramMaker<TGImpl::pointer,Char,Pos>
   {
-    typedef TrigramImpl<TGImpl::pointer,Char,Pos> Trigram;
-    typedef std::vector<Trigram>                  Trigrams;
+    typedef TrigramImpl<TGImpl::pointer,Char,Pos>             trigram_type;
+    typedef typename TrigramContainer<trigram_type>::vec_type trigram_vec_type;
 
     /**
      * Generate a list of trigrams starting at positions not divisible by 3.
@@ -204,9 +211,9 @@ namespace sux {
      * Only complete trigrams are included.
      */
     template <typename Iterator>
-    static Trigrams make_23trigrams(Iterator from, Iterator to)
+    static trigram_vec_type make_23trigrams(Iterator from, Iterator to)
     {
-      Trigrams result;
+      trigram_vec_type result;
       while (std::distance(from,to) >= 5)
       {
         /* Position 0, skip. */
@@ -333,8 +340,8 @@ namespace sux {
      * can be used to represent trigrams. The sorting operation is performed
      * in three passes of radix sort.
      */
-    template <typename TrigramType>
-    static void sort_23trigrams(std::vector<TrigramType> &trigrams)
+    template <template <class,class> class Container, typename TrigramType, typename Alloc>
+    static void sort_23trigrams(Container<TrigramType,Alloc> &trigrams)
     {
       /* Extractor function for the third character of every trigram. */
       auto extractor3 = [](const TrigramType &trigram) { return triget3(trigram); };
@@ -343,7 +350,7 @@ namespace sux {
         accumulated_charcounts(begin(trigrams),end(trigrams),extractor3)
       };
       /* Radix sort, first pass. */
-      std::vector<TrigramType> temp_vec {};
+      Container<TrigramType,Alloc> temp_vec {};
       temp_vec.resize(trigrams.size());
       bucket_sort(begin(trigrams),end(trigrams),extractor3,bucket_sizes,temp_vec);
       std::swap(trigrams,temp_vec);
@@ -364,15 +371,15 @@ namespace sux {
      * Perform one pass of radix sort for trigrams, using the specified number
      * of parallel threads.
      */
-    template <typename TrigramType, typename Extractor>
+    template <template <class,class> class Container, typename TrigramType, typename Extractor, typename Alloc>
     static void sort_23trigrams_one_pass(
-        const std::vector<TrigramType> &trigrams,
-        std::vector<TrigramType>       &dest_vec,
-        Extractor                       extractor,
-        const unsigned                  threads)
+        const Container<TrigramType,Alloc> &trigrams,
+        Container<TrigramType,Alloc>       &dest_vec,
+        Extractor                           extractor,
+        const unsigned                      threads)
     {
       /* Determine start and end positions of each thread. */
-      typedef typename std::vector<TrigramType>::const_iterator It;
+      typedef typename Container<TrigramType,Alloc>::const_iterator It;
       const std::size_t portion { trigrams.size() / threads };
       std::vector<std::pair<It,It>> offsets(threads);
       It endpos { begin(trigrams) };
@@ -450,10 +457,10 @@ namespace sux {
      * Any of the specializations of `TrigramImpl` can be used to represent
      * trigrams. The sorting operation is performed in three passes of radix sort.
      */
-    template <typename TrigramType>
+    template <template <class,class> class Container, typename TrigramType, typename Alloc>
     static void sort_23trigrams(
-        std::vector<TrigramType> &trigrams,
-        const unsigned            threads)
+        Container<TrigramType,Alloc> &trigrams,
+        const unsigned                threads)
     {
       /* Sanity. */
       if (threads < 1)
@@ -464,7 +471,7 @@ namespace sux {
         sort_23trigrams(trigrams,(total/1000==0?1:total/1000));
 
       /* Vector for intermediate results. */
-      std::vector<TrigramType> temp_vec(trigrams.size());
+      Container<TrigramType,Alloc> temp_vec(trigrams.size());
       /* First pass. */
       sort_23trigrams_one_pass(trigrams,temp_vec,triget3<TrigramType>,threads);
       swap(trigrams,temp_vec);
@@ -478,6 +485,22 @@ namespace sux {
 
   };
 
+  template <TGImpl tgimpl = TGImpl::tuple, typename Char = char>
+  typename TrigramMaker<tgimpl,Char,typename std::basic_string<Char>::size_type>::trigram_vec_type
+  string_to_23trigrams(
+      const std::basic_string<Char> &str)
+  {
+    return TrigramMaker<tgimpl,Char,typename std::basic_string<Char>::size_type>::make_23trigrams(
+        begin(str),end(str));
+  }
+
+  template <template <class,class> class Container, TGImpl tgimpl, typename Char, typename Pos, typename Alloc>
+  void sort_23trigrams(
+      Container<TrigramImpl<tgimpl,Char,Pos>,Alloc> &trigrams,
+      const unsigned threads = 1)
+  {
+    TrigramSorter<Char,Pos>::sort_23trigrams(trigrams,threads);
+  }
 
 }
 

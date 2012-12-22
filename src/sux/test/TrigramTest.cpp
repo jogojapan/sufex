@@ -27,33 +27,33 @@ typedef sux::TrigramSorter<Char,Pos>  SSorter;
 typedef sux::TrigramSorter<Char,LPos> LSorter;
 
 typedef sux::TrigramMaker<sux::TGImpl::arraytuple,Char,Pos> SAMaker;
-typedef SAMaker::Trigram             SATrigram;
-typedef SAMaker::Trigrams            SATrigrams;
+typedef SAMaker::trigram_type        SATrigram;
+typedef SAMaker::trigram_vec_type    SATrigrams;
 typedef SSorter::CharFrequency       SCharFrequency;
 typedef SSorter::CharDistribution    SCharDistribution;
 
 typedef sux::TrigramMaker<sux::TGImpl::arraytuple,Char,LPos> LAMaker;
-typedef LAMaker::Trigram            LATrigram;
-typedef LAMaker::Trigrams           LATrigrams;
+typedef LAMaker::trigram_type       LATrigram;
+typedef LAMaker::trigram_vec_type   LATrigrams;
 typedef LSorter::CharFrequency      LACharFrequency;
 typedef LSorter::CharDistribution   LACharDistribution;
 
 typedef sux::TrigramMaker<sux::TGImpl::pointer,Char,LPos> LPMaker;
-typedef LPMaker::Trigram          LPTrigram;
-typedef LPMaker::Trigrams         LPTrigrams;
+typedef LPMaker::trigram_type     LPTrigram;
+typedef LPMaker::trigram_vec_type LPTrigrams;
 
 typedef sux::TrigramMaker<sux::TGImpl::tuple,Char,LPos> LTMaker;
-typedef LTMaker::Trigram          LTTrigram;
-typedef LTMaker::Trigrams         LTTrigrams;
+typedef LTMaker::trigram_type     LTTrigram;
+typedef LTMaker::trigram_vec_type LTTrigrams;
 
 
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_3)
 {
   const std::basic_string<Char> input { (const Char *)"abc" };
-  SAMaker::Trigrams expected {
+  SATrigrams expected {
   };
 
-  SAMaker::Trigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
+  SATrigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -61,11 +61,11 @@ BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_3)
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_4)
 {
   const std::basic_string<Char> input { (const Char *)"abcd" };
-  SAMaker::Trigrams expected {
+  SATrigrams expected {
     SATrigram { 1,'b','c','d' },
   };
 
-  SAMaker::Trigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
+  SATrigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -73,12 +73,12 @@ BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_4)
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_5)
 {
   const std::basic_string<Char> input { (const Char *)"abcde" };
-  SAMaker::Trigrams expected {
+  SATrigrams expected {
     SATrigram { 1,'b','c','d' },
     SATrigram { 2,'c','d','e' }
   };
 
-  SAMaker::Trigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
+  SATrigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -86,12 +86,12 @@ BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_5)
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_6)
 {
   const std::basic_string<Char> input { (const Char *)"abcdef" };
-  SAMaker::Trigrams expected {
+  SATrigrams expected {
     SATrigram { 1,'b','c','d' },
     SATrigram { 2,'c','d','e' }
   };
 
-  SAMaker::Trigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
+  SATrigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -99,13 +99,13 @@ BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_6)
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_7)
 {
   const std::basic_string<Char> input { (const Char *)"abcdefg" };
-  SAMaker::Trigrams expected {
+  SATrigrams expected {
     SATrigram { 1,'b','c','d' },
     SATrigram { 2,'c','d','e' },
     SATrigram { 4,'e','f','g' }
   };
 
-  SAMaker::Trigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
+  SATrigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -113,14 +113,14 @@ BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_7)
 BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_8)
 {
   const std::basic_string<Char> input { (const Char *)"abcdefgh" };
-  SAMaker::Trigrams expected {
+  SATrigrams expected {
     SATrigram { 1,'b','c','d' },
     SATrigram { 2,'c','d','e' },
     SATrigram { 4,'e','f','g' },
     SATrigram { 5,'f','g','h' }
   };
 
-  SAMaker::Trigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
+  SATrigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -145,14 +145,14 @@ BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
 BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
 {
   const std::basic_string<Char> input { (const Char *)"aecabfgc" };
-  SAMaker::Trigrams expected {
+  SATrigrams expected {
     SATrigram { 4,'b','f','g' },
     SATrigram { 2,'c','a','b' },
     SATrigram { 1,'e','c','a' },
     SATrigram { 5,'f','g','c' }
   };
 
-  SAMaker::Trigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
+  SATrigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
   SSorter::sort_23trigrams(actual);
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
@@ -181,9 +181,9 @@ void perform_multi_threaded_trigram_sorting()
       rlxutil::RandomSequenceGeneratorUniform<Char>(' ','z'));
 
   /* Generate trigrams. */
-  typedef sux::TrigramMaker<tgimpl,Char,LPos> TrigramMaker;
-  typedef typename TrigramMaker::Trigram      Trigram;
-  typedef typename TrigramMaker::Trigrams     Trigrams;
+  typedef sux::TrigramMaker<tgimpl,Char,LPos>     TrigramMaker;
+  typedef typename TrigramMaker::trigram_type     Trigram;
+  typedef typename TrigramMaker::trigram_vec_type Trigrams;
 
   Trigrams actual = TrigramMaker::make_23trigrams(begin(input),end(input));
   /* Make a copy of the trigrams, which will later be sorted them separately. */
@@ -225,12 +225,43 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_tuple)
   perform_multi_threaded_trigram_sorting<sux::TGImpl::tuple>();
 }
 
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test3)
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_arraytuple)
 {
   perform_multi_threaded_trigram_sorting<sux::TGImpl::arraytuple>();
 }
 
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test4)
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_pointer)
 {
   perform_multi_threaded_trigram_sorting<sux::TGImpl::pointer>();
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_functional_test)
+{
+  using namespace std;
+  using namespace sux;
+  string input { "abcabeabxd" };
+
+  auto trigrams =
+      TrigramMaker<TGImpl::tuple,string::value_type,size_t>::make_23trigrams(begin(input),end(input));
+
+  TrigramSorter<string::value_type,size_t>::sort_23trigrams(trigrams,1);
+
+  for (const auto &trigram : trigrams)
+    cout << triget1(trigram) << triget2(trigram) << triget3(trigram) << '\n';
+  cout.flush();
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_convenience_test)
+{
+  using namespace std;
+  using namespace sux;
+  basic_string<unsigned char> input { (const unsigned char *)"abcabeabxd" };
+
+  auto trigrams = string_to_23trigrams<TGImpl::arraytuple>(input);
+  sort_23trigrams(trigrams);
+
+  cout << "Trigram type: " << tgimpl_of(trigrams[0]) << endl;
+  for (const auto &trigram : trigrams)
+    cout << triget1(trigram) << triget2(trigram) << triget3(trigram) << '\n';
+  cout.flush();
 }
