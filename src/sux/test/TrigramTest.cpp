@@ -234,34 +234,3 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_pointer)
 {
   perform_multi_threaded_trigram_sorting<sux::TGImpl::pointer>();
 }
-
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_functional_test)
-{
-  using namespace std;
-  using namespace sux;
-  string input { "abcabeabxd" };
-
-  auto trigrams =
-      TrigramMaker<TGImpl::tuple,string::value_type,size_t>::make_23trigrams(begin(input),end(input));
-
-  TrigramSorter<string::value_type,size_t>::sort_23trigrams(trigrams,1);
-
-  for (const auto &trigram : trigrams)
-    cout << triget1(trigram) << triget2(trigram) << triget3(trigram) << '\n';
-  cout.flush();
-}
-
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_convenience_test)
-{
-  using namespace std;
-  using namespace sux;
-  basic_string<unsigned char> input { (const unsigned char *)"abcabeabxd" };
-
-  auto trigrams = string_to_23trigrams<TGImpl::arraytuple>(input);
-  sort_23trigrams(trigrams);
-
-  cout << "Trigram type: " << tgimpl_of(trigrams[0]) << endl;
-  for (const auto &trigram : trigrams)
-    cout << triget1(trigram) << triget2(trigram) << triget3(trigram) << '\n';
-  cout.flush();
-}
