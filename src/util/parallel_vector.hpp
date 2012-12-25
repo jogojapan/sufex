@@ -15,6 +15,9 @@
 #include <type_traits>
 #include <future>
 
+#include "../util/tupletools.hpp"
+#include "../util/more_type_traits.hpp"
+
 namespace rlxutil {
 
   template <typename Elem, unsigned min_portion = 1000, typename Alloc = std::allocator<Elem>>
@@ -45,22 +48,22 @@ namespace rlxutil {
       _data(), _offsets()
     { }
 
-    parallel_vector(std::vector<Elem> &&vec) :
+    parallel_vector(std::vector<Elem,Alloc> &&vec) :
       _data(std::move(vec)), _offsets()
     { }
 
-    parallel_vector(const std::vector<Elem> &vec) :
+    parallel_vector(const std::vector<Elem,Alloc> &vec) :
       _data(vec), _offsets()
     { }
 
-    parallel_vector &operator=(std::vector<Elem> &&vec)
+    parallel_vector &operator=(std::vector<Elem,Alloc> &&vec)
     {
       _data = std::move(vec);
       _offsets.clear();
       return *this;
     }
 
-    parallel_vector &operator=(const std::vector<Elem> &vec)
+    parallel_vector &operator=(const std::vector<Elem,Alloc> &vec)
     {
       _data = vec;
       _offsets.clear();
@@ -87,7 +90,7 @@ namespace rlxutil {
      *   (which may imply waiting for the corresponding thread to finish).
      */
     template <typename Fun, typename... Args>
-    std::vector<typename std::future<std::result_of<Fun(It,It,Args...)>::type>>
+    std::vector<typename std::future<typename std::result_of<Fun(It,It,Args...)>::type>>
     parallel_perform(std::size_t threads, Fun&& fun, Args&&... args)
     {
       using std::pair;
@@ -128,12 +131,73 @@ namespace rlxutil {
      * @parameter args... Additional arguments to the function
      */
     template <typename Fun, typename... Args>
-    std::vector<typename std::future<std::result_of<Fun(It,It,Args...)>::type>>
+    std::vector<typename std::future<typename std::result_of<Fun(It,It,Args...)>::type>>
     parallel_perform(Fun&& fun, Args&&... args)
     {
       using std::forward;
       std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
       return parallel_perform(threads,forward<Fun>(fun),forward<Args>(args)...);
+    }
+
+    template <typename Fun>
+    struct is_generator
+    {
+      static constexpr bool value =
+        (function_traits<Fun>::arity == 1
+         && std::is_integral<typename function_traits<Fun>::template arg<0>::type>::value
+         && is_instance_of<std::tuple,typename function_traits<Fun>::result_type>::value
+         );
+    };
+
+    /**
+     * Apply a function to all elements of the vector, running multiple
+     * threads in parallel.
+     * @parameter threads The number of threads to be used
+     * @parameter fun The function to be applied. The function must take
+     *   at least two `const_iterator` arguments, specifying the range
+     *   of elements to which it will be applied. It can optionally take
+     *   further arguments of any type.
+     * @parameter args... Additional arguments to the function
+     * @return A vector of futures. The threads may still be running when
+     *   the vector is returned. Use `get()` to access each result
+     *   (which may imply waiting for the corresponding thread to finish).
+     */
+    template <typename Fun, typename Generator>
+    typename std::enable_if<is_generator<Generator>::value,
+       std::vector<typename std::future<
+          typename function_traits<Fun>::result_type>>>::type
+    parallel_perform(std::size_t threads, Fun&& fun, Generator gen)
+    {
+      using std::pair;
+      using std::vector;
+      using std::future;
+      using std::async;
+      using std::forward;
+      using rlxutil::call_on_tuple;
+      using std::make_tuple;
+      using std::tuple_cat;
+
+      typedef typename function_traits<Fun>::result_type result_type;
+
+      if (_offsets.size() != threads)
+        parallelize(threads);
+
+      vector<future<result_type>> results
+      { };
+
+      std::size_t counter = 0;
+      for (const pair<It,It> &os : _offsets)
+      {
+        future<result_type> fut
+        {
+          async(std::launch::async,
+              call_on_tuple,forward<Fun>(fun),tuple_cat(make_tuple(os.first,os.second),gen(counter)))
+        };
+        results.push_back(std::move(fut));
+        ++counter;
+      }
+
+      return results;
     }
 
     void assign(size_type count, const Elem &value)
@@ -225,7 +289,7 @@ namespace rlxutil {
     { return _data.size(); }
 
     size_type max_size() const noexcept
-    { return _data.max_size() }
+    { return _data.max_size(); }
 
     void reserve(size_type size)
     { _data.reserve(size); }
@@ -373,8 +437,6 @@ namespace rlxutil {
     }
 
   private:
-    typedef typename std::vector<Elem,Alloc>::const_iterator It;
-
     /** Internal storage. */
     std::vector<Elem,Alloc>        _data;
     /** Start and end offsets for threads. Note that the standard

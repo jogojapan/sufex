@@ -66,9 +66,9 @@ enable_testing ()
 add_executable (${test_bin_dir}/S2SParserTest s2s/test/S2SParserTest.cpp)
 add_test (S2SParserTest ${test_bin_dir}/S2SParserTest)
 
-# add_executable (${test_bin_dir}/TrigramTest sux/test/TrigramTest.cpp)
-# target_link_libraries (${test_bin_dir}/TrigramTest ${Boost_LIBRARIES} ${GLOG_LIBRARY})
-# add_test (TrigramTest ${test_bin_dir}/TrigramTest)
+add_executable (${test_bin_dir}/TrigramTest sux/test/TrigramTest.cpp)
+target_link_libraries (${test_bin_dir}/TrigramTest ${Boost_LIBRARIES} ${GLOG_LIBRARY})
+add_test (TrigramTest ${test_bin_dir}/TrigramTest)
 
 add_executable (${test_bin_dir}/TupletoolsTest util/test/TupletoolsTest.cpp)
 add_test (TupletoolsTest ${test_bin_dir}/TupletoolsTest)

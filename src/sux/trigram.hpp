@@ -1,12 +1,12 @@
 /*
- * sux.hpp
+ * trigram.hpp
  *
  *  Created on: 2012/07/31
  *      Author: jogojapan
  */
 
-#ifndef SUX_HPP_
-#define SUX_HPP_
+#ifndef TRIGRAM_HPP_
+#define TRIGRAM_HPP_
 
 #include <utility>
 #include <tuple>
@@ -20,6 +20,9 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+
+#include "alphabet.hpp"
+#include "../util/parallel_vector.hpp"
 
 namespace sux {
 
@@ -452,6 +455,9 @@ namespace sux {
         sort_future.get();
     }
 
+    template<typename Dummy, AlphabetClass alphabetclass = AlphabetClass::sparse>
+    struct AlphabetSpecific;
+
     /**
      * Sort trigrams lexicographically, using the specified number of threads.
      * Any of the specializations of `TrigramImpl` can be used to represent
@@ -481,6 +487,85 @@ namespace sux {
       /* Third pass. */
       sort_23trigrams_one_pass(trigrams,temp_vec,triget1<TrigramType>,threads);
       swap(trigrams,temp_vec);
+    }
+
+  };
+
+  template <typename Char, typename Pos>
+  template <typename Dummy>
+  struct TrigramSorter<Char,Pos>::AlphabetSpecific<Dummy,AlphabetClass::sparse>
+  {
+    typedef Alphabet<AlphabetClass::sparse,Char> alphabet_type;
+    typedef TrigramSorter<Char,Pos>              base;
+    typedef typename base::CharDistribution      CharDistribution;
+    typedef typename base::CharFrequency         CharFrequency;
+    template <typename Elem> using parallel_vector = rlxutil::parallel_vector<Elem>;
+
+    /**
+     * Perform one pass of radix sort for trigrams, using the specified number
+     * of parallel threads.
+     */
+    template <typename TrigramType, typename Extractor>
+    static void sort_23trigrams_one_pass(
+        const parallel_vector<TrigramType>  &trigrams,
+        parallel_vector<TrigramType>        &dest_vec,
+        alphabet_type                        alphabet,
+        Extractor                            extractor)
+    {
+      using std::vector;
+      using std::make_tuple;
+      using std::ref;
+
+      typedef typename parallel_vector<TrigramType>::const_iterator It;
+      auto frqtab_vec = trigrams.parallel_perform
+          (base::generate_freq_table<It,Extractor,CharDistribution>,extractor);
+
+      /* Initialise cumulative frequencies per thread. This will
+       * be filled with the correct values later. */
+      vector<CharDistribution> cumul_frqtab_vec
+      { };
+
+      /* Total frequency, for each character. */
+      CharDistribution cumul_frqtab
+      { };
+      for (auto &it : frqtab_vec)
+      {
+        /* Move the thread-local frequency table out
+         * of its future. */
+        CharDistribution frqtab
+        { it.get() };
+        /* Update the total frequency table. */
+        for (const CharFrequency &entry : frqtab)
+          cumul_frqtab[entry.first] += entry.second;
+        /* Move thread-local frequency table to the end of the
+         * thread-local cumulative frequency table list. Note
+         * that the frequencies are not really cumulative yet;
+         * this will be corrected later. */
+        cumul_frqtab_vec.push_back(std::move(frqtab));
+      }
+
+      /* Cumulate the entries of the global frequency table. */
+      accumulate_frequencies(cumul_frqtab);
+
+      /* Correct the cumulative thread-local frequencies. */
+      for (CharDistribution &frqtab : cumul_frqtab_vec) {
+        /* Swap with current version of global cumulative
+         * frequency table. */
+        std::swap(cumul_frqtab,frqtab);
+        /* Add local character frequencies of current thread to
+         * new version of global table. */
+        for (const CharFrequency &entry : frqtab)
+          cumul_frqtab[entry.first] += entry.second;
+      }
+
+      /* Radix-sorting threads. */
+      auto sort_fut_vec = trigrams.parallel_perform
+          (4,base::bucket_sort<It,Extractor,TrigramType>,extractor,
+              [&cumul_frqtab,&dest_vec](int index) {
+        return make_tuple(ref(cumul_frqtab[index]),ref(dest_vec));
+      });
+      for (auto &sort_future : sort_fut_vec)
+        sort_future.get();
     }
 
   };
