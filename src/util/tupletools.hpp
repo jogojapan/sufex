@@ -125,14 +125,60 @@ namespace rlxutil {
 
   } // namespace tuple
 
-  /**
-   * Auxiliary function for call_on_tuple().
-   */
-  template <typename Fun, typename... Args, unsigned... Is>
-  typename std::result_of<Fun(Args...)>::type
-  call_on_indexed_tuple(Fun&& f, std::tuple<Args...>&& tup, tuple::indices<Is...>)
-  {
-    return f(std::get<Is>(tup)...);
+  namespace detail {
+
+    /**
+     * Auxiliary function for call_on_tuple(), taking the tuple as rvalue
+     * reference.
+     * @return f(args...)
+     */
+    template <typename Fun, typename... Args, unsigned... Is>
+    typename std::enable_if<!std::is_void<typename std::result_of<Fun(Args...)>::type>::value,
+                            typename std::result_of<Fun(Args...)>::type>::type
+    call_on_tuple(Fun&& f, std::tuple<Args...>&& tup, tuple::indices<Is...>)
+    {
+      return f(std::get<Is>(tup)...);
+    }
+
+    /**
+     * Auxiliary function for call_on_tuple(), taking the tuple as const
+     * lvalue reference.
+     * @return f(args...)
+     */
+    template <typename Fun, typename... Args, unsigned... Is>
+    typename std::enable_if<!std::is_void<typename std::result_of<Fun(Args...)>::type>::value,
+                            typename std::result_of<Fun(Args...)>::type>::type
+    call_on_tuple(Fun&& f, const std::tuple<Args...>& tup, tuple::indices<Is...>)
+    {
+      return f(std::get<Is>(tup)...);
+    }
+
+    /**
+     * Auxiliary function for call_on_tuple(), taking the tuple as rvalue
+     * reference.
+     * @return void
+     */
+    template <typename Fun, typename... Args, unsigned... Is>
+    typename std::enable_if<std::is_void<typename std::result_of<Fun(Args...)>::type>::value,
+                            void>::type
+    call_on_tuple(Fun&& f, std::tuple<Args...>&& tup, tuple::indices<Is...>)
+    {
+      f(std::get<Is>(tup)...);
+    }
+
+    /**
+     * Auxiliary function for call_on_tuple(), taking the tuple as const
+     * lvalue reference.
+     * @return void
+     */
+    template <typename Fun, typename... Args, unsigned... Is>
+    typename std::enable_if<std::is_void<typename std::result_of<Fun(Args...)>::type>::value,
+                            void>::type
+    call_on_tuple(Fun&& f, const std::tuple<Args...>& tup, tuple::indices<Is...>)
+    {
+      f(std::get<Is>(tup)...);
+    }
+
   }
 
   /**
@@ -144,24 +190,16 @@ namespace rlxutil {
    * @return The return value of f(get<0>(tup),get<1>(tup),...);
    */
   template <typename Fun, typename... Args>
-  typename std::result_of<Fun(Args...)>::type call_on_tuple(Fun&& f, std::tuple<Args...>&& tup)
+  typename std::enable_if<!std::is_void<typename std::result_of<Fun(Args...)>::type>::value,
+                          typename std::result_of<Fun(Args...)>::type>::type
+  call_on_tuple(Fun&& f, std::tuple<Args...>&& tup)
   {
     using std::tuple;
     using std::forward;
     using tuple::index_maker;
 
-    return call_on_indexed_tuple
+    return detail::call_on_tuple
         (forward<Fun>(f),forward<tuple<Args...>>(tup),typename index_maker<sizeof...(Args)>::type());
-  }
-
-  /**
-   * Auxiliary function for call_on_tuple().
-   */
-  template <typename Fun, typename... Args, unsigned... Is>
-  typename std::result_of<Fun(Args...)>::type
-  call_on_indexed_tuple(Fun&& f, const std::tuple<Args...>& tup, tuple::indices<Is...>)
-  {
-    return f(std::get<Is>(tup)...);
   }
 
   /**
@@ -173,13 +211,57 @@ namespace rlxutil {
    * @return The return value of f(get<0>(tup),get<1>(tup),...);
    */
   template <typename Fun, typename... Args>
-  typename std::result_of<Fun(Args...)>::type call_on_tuple(Fun&& f, const std::tuple<Args...>& tup)
+  typename std::enable_if<!std::is_void<typename std::result_of<Fun(Args...)>::type>::value,
+                          typename std::result_of<Fun(Args...)>::type>::type
+  call_on_tuple(Fun&& f, const std::tuple<Args...>& tup)
   {
     using std::tuple;
     using std::forward;
     using tuple::index_maker;
 
-    return call_on_indexed_tuple
+    return detail::call_on_tuple
+        (forward<Fun>(f),forward<const tuple<Args...>>(tup),typename index_maker<sizeof...(Args)>::type());
+  }
+
+  /**
+   * Call a function, using the elements of an rvalue-reference tuple as arguments to
+   * the function call.
+   * @param f The function to be called. The types of its arguments must correspond to
+   *    the types of the elements of the tuple.
+   * @param tup The tuple of function arguments
+   * @return The return value of f(get<0>(tup),get<1>(tup),...);
+   */
+  template <typename Fun, typename... Args>
+  typename std::enable_if<std::is_void<typename std::result_of<Fun(Args...)>::type>::value,
+                          void>::type
+  call_on_tuple(Fun&& f, std::tuple<Args...>&& tup)
+  {
+    using std::tuple;
+    using std::forward;
+    using tuple::index_maker;
+
+    detail::call_on_tuple
+        (forward<Fun>(f),forward<tuple<Args...>>(tup),typename index_maker<sizeof...(Args)>::type());
+  }
+
+  /**
+   * Call a function, using the elements of an lvalue-reference tuple as arguments to
+   * the function call.
+   * @param f The function to be called. The types of its arguments must correspond to
+   *    the types of the elements of the tuple.
+   * @param tup The tuple of function arguments
+   * @return The return value of f(get<0>(tup),get<1>(tup),...);
+   */
+  template <typename Fun, typename... Args>
+  typename std::enable_if<std::is_void<typename std::result_of<Fun(Args...)>::type>::value,
+                          void>::type
+  call_on_tuple(Fun&& f, const std::tuple<Args...>& tup)
+  {
+    using std::tuple;
+    using std::forward;
+    using tuple::index_maker;
+
+    detail::call_on_tuple
         (forward<Fun>(f),forward<const tuple<Args...>>(tup),typename index_maker<sizeof...(Args)>::type());
   }
 
