@@ -539,7 +539,7 @@ namespace sux {
 
       typedef parallel_vector<TrigramType>      vec_type;
       typedef typename vec_type::const_iterator It;
-      auto frqtab_vec = trigrams.parallel_perform
+      auto frqtab_vec = trigrams.parallel_apply
           (base::generate_freq_table<It,Extractor,CharDistribution>,extractor);
 
       using namespace rlxutil::parallel_vector_tools;
@@ -583,12 +583,12 @@ namespace sux {
       }
 
       /* Radix-sorting threads. */
-      auto sort_fut_vec = trigrams.parallel_perform_generate_args
+      auto sort_fut_vec = trigrams.parallel_apply_generate_args
           (base::bucket_sort2<It,Extractor,TrigramType>,
            arg_generator(
-               [&cumul_frqtab_vec,&dest_vec,&extractor](int index)
+               [&cumul_frqtab_vec,&dest_vec,&extractor](int thread)
            {
-              return make_tuple(extractor,ref(cumul_frqtab_vec[index]),ref(dest_vec));
+              return make_tuple(extractor,ref(cumul_frqtab_vec[thread]),ref(dest_vec));
            })
           );
       for (auto &sort_future : sort_fut_vec)

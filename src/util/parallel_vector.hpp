@@ -129,7 +129,7 @@ namespace rlxutil {
      */
     template <typename Fun, typename... Args>
     std::vector<typename std::future<typename std::result_of<Fun(It,It,Args...)>::type>>
-    _parallel_perform(std::size_t threads, Fun&& fun, Args&&... args)
+    _parallel_apply(std::size_t threads, Fun&& fun, Args&&... args)
     {
       using std::pair;
       using std::vector;
@@ -175,7 +175,7 @@ namespace rlxutil {
     typename std::enable_if<parallel_vector_tools::is_arg_generator<Generator>::value,
        std::vector<typename std::future<
           typename function_traits<Fun>::result_type>>>::type
-    _parallel_perform_gen(std::size_t threads, Fun&& fun, Generator gen)
+    _parallel_apply_generate_args(std::size_t threads, Fun&& fun, Generator gen)
     {
       using std::pair;
       using std::vector;
@@ -229,11 +229,11 @@ namespace rlxutil {
      */
     template <typename Fun, typename... Args>
     std::vector<typename std::future<typename std::result_of<Fun(It,It,Args...)>::type>>
-    parallel_perform(Fun&& fun, Args&&... args)
+    parallel_apply(Fun&& fun, Args&&... args)
     {
       using std::forward;
       std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
-      return _parallel_perform(threads,forward<Fun>(fun),forward<Args>(args)...);
+      return _parallel_apply(threads,forward<Fun>(fun),forward<Args>(args)...);
     }
 
     /**
@@ -257,11 +257,11 @@ namespace rlxutil {
     typename std::enable_if<parallel_vector_tools::is_arg_generator<Generator>::value,
        std::vector<typename std::future<
           typename function_traits<Fun>::result_type>>>::type
-    parallel_perform_generate_args(Fun&& fun, Generator gen)
+    parallel_apply_generate_args(Fun&& fun, Generator gen)
     {
       using std::forward;
       std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
-      return _parallel_perform_gen(threads,forward<Fun>(fun),gen);
+      return _parallel_apply_generate_args(threads,forward<Fun>(fun),gen);
     }
 
     void assign(size_type count, const Elem &value)
