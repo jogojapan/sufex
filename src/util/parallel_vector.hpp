@@ -15,10 +15,38 @@
 #include <type_traits>
 #include <future>
 
+#include <glog/logging.h>
+
 #include "../util/tupletools.hpp"
 #include "../util/more_type_traits.hpp"
 
 namespace rlxutil {
+
+  namespace parallel_vector_tools {
+    template <typename Fun>
+    Fun &&arg_generator(Fun&& fun)
+    {
+      static_assert(function_traits<Fun>::arity == 1,
+          "For generator(fun) to work, fun needs to be a function that takes exactly one integer argument.");
+      typedef typename function_traits<Fun>::template arg<0>::type first_arg_type;
+      static_assert(std::is_integral<first_arg_type>::value,
+          "For generator(fun) to work, fun needs to be a function that takes exactly one integer argument.");
+      typedef typename function_traits<Fun>::result_type result_type;
+      static_assert(is_instance_of<std::tuple,result_type>::value,
+          "For generator(fun) to work, fun needs to be a function that returns tuples.");
+      return std::forward<Fun>(fun);
+    }
+
+    template <typename Fun>
+    struct is_arg_generator
+    {
+      static constexpr bool value =
+          (function_traits<Fun>::arity == 1
+              && std::is_integral<typename function_traits<Fun>::template arg<0>::type>::value
+              && is_instance_of<std::tuple,typename function_traits<Fun>::result_type>::value
+          );
+    };
+  }
 
   template <typename Elem, unsigned min_portion = 1000, typename Alloc = std::allocator<Elem>>
   class parallel_vector
@@ -111,6 +139,8 @@ namespace rlxutil {
 
       typedef typename std::result_of<Fun(It,It,Args...)>::type result_type;
 
+      LOG(DEBUG) << "Running parallel_perform without generator";
+
       if (_offsets.size() != threads)
         parallelize(threads);
 
@@ -127,18 +157,6 @@ namespace rlxutil {
       return results;
     }
 
-  public:
-    template <typename Fun>
-    struct is_generator
-    {
-      static constexpr bool value =
-        (function_traits<Fun>::arity == 1
-         && std::is_integral<typename function_traits<Fun>::template arg<0>::type>::value
-         && is_instance_of<std::tuple,typename function_traits<Fun>::result_type>::value
-         );
-    };
-
-  private:
     /**
      * Apply a function to all elements of the vector, running multiple
      * threads in parallel.
@@ -147,15 +165,16 @@ namespace rlxutil {
      *   at least two `const_iterator` arguments, specifying the range
      *   of elements to which it will be applied. It can optionally take
      *   further arguments of any type.
-     * @parameter args... Additional arguments to the function
+     * @parameter gen A lambda function used to generate arguments for
+     *   the calls to fun.
      * @return A vector of futures. The threads may still be running when
      *   the vector is returned. Use `get()` to access each result
      *   (which may imply waiting for the corresponding thread to finish).
      */
     template <typename Fun, typename Generator>
-    typename std::enable_if<is_generator<Generator>::value,
-    std::vector<typename std::future<
-    typename function_traits<Fun>::result_type>>>::type
+    typename std::enable_if<parallel_vector_tools::is_arg_generator<Generator>::value,
+       std::vector<typename std::future<
+          typename function_traits<Fun>::result_type>>>::type
     _parallel_perform_gen(std::size_t threads, Fun&& fun, Generator gen)
     {
       using std::pair;
@@ -168,6 +187,8 @@ namespace rlxutil {
       using std::tuple_cat;
 
       typedef typename function_traits<Fun>::result_type result_type;
+
+      LOG(DEBUG) << "Running parallel_perform with generator";
 
       if (_offsets.size() != threads)
         parallelize(threads);
@@ -184,9 +205,6 @@ namespace rlxutil {
                 [os,counter,&fun,&gen]() {
                   call_on_tuple(fun,tuple_cat(make_tuple(os.first,os.second),gen(counter)));
                 })
-//            async(std::launch::async,
-//                call_on_tuple<Fun,decltype(tuple_cat(make_tuple(os.first,os.second),gen(counter)))>,
-//                forward<Fun>(fun),tuple_cat(make_tuple(os.first,os.second),gen(counter)))
           };
           results.push_back(std::move(fut));
           ++counter;
@@ -195,18 +213,7 @@ namespace rlxutil {
       return results;
     }
 
-public:
-    template <typename Fun, typename Generator>
-    typename std::enable_if<is_generator<Generator>::value,
-       std::vector<typename std::future<
-          typename function_traits<Fun>::result_type>>>::type
-    parallel_perform_gen(Fun&& fun, Generator gen)
-    {
-      using std::forward;
-      std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
-      return _parallel_perform_gen(threads,forward<Fun>(fun),gen);
-    }
-
+  public:
     /**
      * Apply a function to all elements of the vector, running multiple
      * threads in parallel. The number of threads used is the same as was
@@ -227,6 +234,34 @@ public:
       using std::forward;
       std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
       return _parallel_perform(threads,forward<Fun>(fun),forward<Args>(args)...);
+    }
+
+    /**
+     * Apply a function to all elements of the vector, running multiple
+     * threads in parallel. The number of threads used is the same as was
+     * used in the previous call of `parallel_perform()` or
+     * `parallel_perform_generate_args()`, or the number specified in the
+     * most recent call to `num_threads()`, whichever happened more recently.
+     * If neither function has ever been called on this instance, the number
+     * of threads is 1.
+     * @parameter fun The function to be applied. The function must take
+     *   at least two `const_iterator` arguments, specifying the range
+     *   of elements to which it will be applied. It can optionally take
+     *   further arguments of any type.
+     * @parameter gen A lambda function that will be used to generate
+     *   arguments for the call to fun. The lambda must take an integer
+     *   is argument and return a tuple. The integer will be 0 for the
+     *   first thread created, 1 for the second, and so on.
+     */
+    template <typename Fun, typename Generator>
+    typename std::enable_if<parallel_vector_tools::is_arg_generator<Generator>::value,
+       std::vector<typename std::future<
+          typename function_traits<Fun>::result_type>>>::type
+    parallel_perform_generate_args(Fun&& fun, Generator gen)
+    {
+      using std::forward;
+      std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
+      return _parallel_perform_gen(threads,forward<Fun>(fun),gen);
     }
 
     void assign(size_type count, const Elem &value)
