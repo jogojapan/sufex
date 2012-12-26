@@ -339,6 +339,28 @@ namespace sux {
     }
 
     /**
+     * Perform a bucket-sort of the elements in the range [from,to), using the
+     * given extractor to determine the sorting criterion. The result will
+     * be sorted into to_vec. to_vec must be resize()'ed by the caller
+     * before the call. bucket_sizes must be prepared by the caller so it
+     * provides the size of each bucket.
+     */
+    template <typename Iterator, typename CharExtractor, typename Elem>
+    static void bucket_sort2(
+        Iterator           from,
+        Iterator           to,
+        CharExtractor      extractor,
+        CharDistribution  &bucket_sizes,
+        rlxutil::parallel_vector<Elem> &to_vec)
+    {
+      while (from != to)
+      {
+        to_vec[bucket_sizes[extractor(*from)]++] = *from;
+        ++from;
+      }
+    }
+
+    /**
      * Sort trigrams lexicographically. Any of the specializations of `TrigramImpl`
      * can be used to represent trigrams. The sorting operation is performed
      * in three passes of radix sort.
@@ -507,10 +529,9 @@ namespace sux {
      */
     template <typename TrigramType, typename Extractor>
     static void sort_23trigrams_one_pass(
-        const parallel_vector<TrigramType>  &trigrams,
-        parallel_vector<TrigramType>        &dest_vec,
-        alphabet_type                        alphabet,
-        Extractor                            extractor)
+        parallel_vector<TrigramType>  &trigrams,
+        parallel_vector<TrigramType>  &dest_vec,
+        Extractor                      extractor)
     {
       using std::vector;
       using std::make_tuple;
@@ -545,7 +566,7 @@ namespace sux {
       }
 
       /* Cumulate the entries of the global frequency table. */
-      accumulate_frequencies(cumul_frqtab);
+      base::accumulate_frequencies(cumul_frqtab);
 
       /* Correct the cumulative thread-local frequencies. */
       for (CharDistribution &frqtab : cumul_frqtab_vec) {
@@ -559,15 +580,35 @@ namespace sux {
       }
 
       /* Radix-sorting threads. */
-      auto sort_fut_vec = trigrams.parallel_perform
-          (4,base::bucket_sort<It,Extractor,TrigramType>,extractor,
-              [&cumul_frqtab,&dest_vec](int index) {
-        return make_tuple(ref(cumul_frqtab[index]),ref(dest_vec));
-      });
+      auto sort_fut_vec = trigrams.parallel_perform_gen
+          (base::bucket_sort2<It,Extractor,TrigramType>,
+           [&cumul_frqtab_vec,&dest_vec,&extractor](int index) {
+              return make_tuple(extractor,ref(cumul_frqtab_vec[index]),ref(dest_vec));
+           }
+          );
       for (auto &sort_future : sort_fut_vec)
         sort_future.get();
     }
 
+    template <typename TrigramType>
+    static void sort_23trigrams(
+        parallel_vector<TrigramType> &trigrams,
+        const std::size_t             threads)
+    {
+      trigrams.num_threads(threads);
+
+      /* Vector for intermediate results. */
+      parallel_vector<TrigramType> temp_vec(trigrams.size());
+      /* First pass. */
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget3<TrigramType>);
+      swap(trigrams,temp_vec);
+      /* Second pass. */
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget2<TrigramType>);
+      swap(trigrams,temp_vec);
+      /* Third pass. */
+      sort_23trigrams_one_pass(trigrams,temp_vec,triget1<TrigramType>);
+      swap(trigrams,temp_vec);
+    }
   };
 
   template <TGImpl tgimpl = TGImpl::tuple, typename Char = char>

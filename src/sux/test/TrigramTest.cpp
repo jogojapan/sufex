@@ -14,6 +14,7 @@
 #include <glog/logging.h>
 
 #include "../trigram.hpp"
+#include "../alphabet.hpp"
 #include "../../util/random.hpp"
 #include "../../util/proctime.hpp"
 
@@ -170,6 +171,8 @@ void perform_multi_threaded_trigram_sorting()
       << sux::repr<tgimpl>::str
       << " trigram implementation";
 
+  using rlxutil::parallel_vector;
+
   /* Prepare for precise time measurements. */
   typedef std::chrono::duration<double,std::milli> MS;
 
@@ -183,15 +186,16 @@ void perform_multi_threaded_trigram_sorting()
   /* Generate trigrams. */
   typedef sux::TrigramMaker<tgimpl,Char,LPos>     TrigramMaker;
   typedef typename TrigramMaker::trigram_type     Trigram;
-  typedef typename TrigramMaker::trigram_vec_type Trigrams;
 
-  Trigrams actual = TrigramMaker::make_23trigrams(begin(input),end(input));
+  parallel_vector<Trigram> actual
+  { TrigramMaker::make_23trigrams(begin(input),end(input)) };
   /* Make a copy of the trigrams, which will later be sorted them separately. */
-  Trigrams expected { actual };
+  parallel_vector<Trigram> expected
+  { actual };
 
   /* Trigam sort. */
   auto tp1 = rlxutil::combined_clock<std::micro>::now();
-  LSorter::sort_23trigrams(actual,4);
+  LSorter::AlphabetSpecific<void,sux::AlphabetClass::sparse>::sort_23trigrams(actual,4);
   auto tp2 = rlxutil::combined_clock<std::micro>::now();
   /* Alternative trigram sort, as reference. */
   auto tp3 = rlxutil::combined_clock<std::micro>::now();
