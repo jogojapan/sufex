@@ -104,6 +104,12 @@ namespace rlxutil {
       _data(vec), _offsets()
     { }
 
+    parallel_vector(
+        std::initializer_list<Elem> init,
+        const Alloc &alloc = Alloc()) :
+      _data(init,alloc), _offsets()
+    { }
+
     parallel_vector &operator=(std::vector<Elem,Alloc> &&vec)
     {
       _data = std::move(vec);
@@ -119,7 +125,7 @@ namespace rlxutil {
     }
 
     std::size_t num_threads() const
-    { return _offsets.size(); }
+    { return (_offsets.empty() ? 1 : _offsets.size()); }
 
     void num_threads(std::size_t threads)
     { parallelize(threads); }

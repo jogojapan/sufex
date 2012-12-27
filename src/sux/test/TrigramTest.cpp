@@ -1,7 +1,7 @@
 //#include "./S2SParser.hpp"
 
 #define BOOST_TEST_DYN_LINK
-#define BOOST_TEST_MODULE S2SParserTest
+#define BOOST_TEST_MODULE TrigramTest
 #include <boost/test/included/unit_test.hpp>
 
 #include <iterator>
@@ -145,16 +145,21 @@ BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
 
 BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
 {
+  using rlxutil::parallel_vector;
+
   const std::basic_string<Char> input { (const Char *)"aecabfgc" };
-  SATrigrams expected {
+  parallel_vector<SATrigram> expected
+  {
     SATrigram { 4,'b','f','g' },
     SATrigram { 2,'c','a','b' },
     SATrigram { 1,'e','c','a' },
     SATrigram { 5,'f','g','c' }
   };
 
-  SATrigrams actual = SAMaker::make_23trigrams(begin(input),end(input));
-  SSorter::sort_23trigrams(actual);
+  parallel_vector<SATrigram> actual
+  { SAMaker::make_23trigrams(begin(input),end(input)) };
+
+  SSorter::AlphabetSpecific<sux::AlphabetClass::sparse>::sort_23trigrams(actual);
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -194,8 +199,9 @@ void perform_multi_threaded_trigram_sorting()
   { actual };
 
   /* Trigam sort. */
+  actual.num_threads(4);
   auto tp1 = rlxutil::combined_clock<std::micro>::now();
-  LSorter::AlphabetSpecific<void,sux::AlphabetClass::sparse>::sort_23trigrams(actual,4);
+  LSorter::AlphabetSpecific<sux::AlphabetClass::sparse>::sort_23trigrams(actual);
   auto tp2 = rlxutil::combined_clock<std::micro>::now();
   /* Alternative trigram sort, as reference. */
   auto tp3 = rlxutil::combined_clock<std::micro>::now();

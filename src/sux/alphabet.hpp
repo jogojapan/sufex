@@ -15,6 +15,14 @@
 
 namespace sux {
 
+  /** Alphabet types:
+   * sparse, a limited number of integers from a wide set of possible integers)
+   * zero_range, a range of integers [0,K) */
+  enum class AlphabetClass { sparse, zero_range };
+
+  template <AlphabetClass alphabetclass, typename Char = char, typename Freq = std::size_t>
+  struct Alphabet;
+
   namespace alphabet_tools {
     /**
      * Generate frequency table for the text span [from,to). Use the given
@@ -31,38 +39,47 @@ namespace sux {
     }
   }
 
-  /** Alphabet types:
-   * sparse, a limited number of integers from a wide set of possible integers)
-   * zero_range, a range of integers [0,K)
-   * range, a range of integers [K1,K2) */
-  enum class AlphabetClass { sparse, zero_range, range };
-
-  template <AlphabetClass alphabetclass, typename Char = char>
-  struct Alphabet;
-
-  template <typename Char>
-  struct Alphabet<AlphabetClass::sparse,Char>
+  template <typename Char, typename Freq>
+  struct Alphabet<AlphabetClass::sparse,Char,Freq>
   {
-    typedef std::pair<Char,Pos> char_freq_type;
-    typedef std::map<Char,Pos>  freq_table_type;
+    typedef Char                 char_type;
+    typedef Freq                 freq_type;
+    typedef std::pair<Char,Freq> char_freq_type;
+    typedef std::map<Char,Freq>  freq_table_type;
 
     /**
      * Adding the character frequencies of the second frequency
      * table to those of the first.
      */
-    void add_char_freq_table(
+    static void add_char_freq_table(
         freq_table_type &main_table, const freq_table_type &add_table)
     {
       for (const char_freq_type &entry : add_table)
         main_table[entry.first] += entry.second;
+    }
+
+    /**
+     * Turn a character frequency table into a cumulative character
+     * frequency table, i.e. the frequency of each character
+     * being the sum all previous character frequencies added
+     * to its own frequency.
+     */
+    static void make_cumulative(freq_table_type &freq_table)
+    {
+      freq_type total
+      { 0 };
+      for (auto &entry : freq_table) {
+        std::swap(total,entry.second);
+        total += entry.second;
+      }
     }
   };
 
   /**
    * A continuous integer alphabet from (Char)0 to _highest.
    */
-  template <typename Char>
-  struct Alphabet<AlphabetClass::zero_range,Char>
+  template <typename Char, typename Freq>
+  struct Alphabet<AlphabetClass::zero_range,Char,Freq>
   {
     static_assert(std::is_integral<Char>::value,
         "A zero-range alphabet must be an integer alphabet");
@@ -73,19 +90,21 @@ namespace sux {
     : _highest(highest)
     { }
 
-    typedef rlxutil::parallel_vector<Char>  freq_table_type;
+    typedef Char    char_type;
+    typedef Freq    freq_type;
+    typedef rlxutil::parallel_vector<Freq>  freq_table_type;
 
     /**
      * Adding the character frequencies of the second frequency
      * table to those of the first. If the alphabet is very large,
      * the operation will be parallelised.
      */
-    void add_char_freq_table(
+    static void add_char_freq_table(
         freq_table_type &main_table, const freq_table_type &add_table)
     {
       using std::distance;
       using std::size_t;
-      using It = freq_table_type::iterator;
+      using It = typename freq_table_type::iterator;
 
       const It start
       { main_table.begin() };
@@ -104,29 +123,22 @@ namespace sux {
           }
       });
     }
-  };
 
-  /**
-   * A continuous integer alphabet from _lowest to _highest. Use the
-   * from_zero function to transform characters to the range
-   * `[0,_highest-_lowest)`.
-   */
-  template <typename Char>
-  struct Alphabet<AlphabetClass::range,Char>
-  {
-    static_assert(false,"The implementation of this isn't complete.");
-
-    static_assert(std::is_integral<Char>::value,
-        "A range alphabet must be an integer alphabet");
-    Char _lowest;
-    Char _highest;
-
-    constexpr Alphabet(const Char lowest, const Char highest)
-    : _lowest(lowest), _highest(highest)
-    { }
-
-    constexpr Char from_zero(const Char c)
-    { return (c - _lowest); }
+    /**
+     * Turn a character frequency table into a cumulative character
+     * frequency table, i.e. the frequency of each character
+     * being the sum all previous character frequencies added
+     * together.
+     */
+    static void make_cumulative(freq_table_type &freq_table)
+    {
+      freq_type total
+      { 0 };
+      for (freq_type &freq : freq_table) {
+        std::swap(total,freq);
+        total += freq;
+      }
+    }
   };
 
 }
