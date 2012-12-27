@@ -50,6 +50,7 @@ namespace sux {
   struct TrigramImpl<TGImpl::tuple,Char,Pos> : public std::tuple<Pos,Char,Char,Char> {
     typedef std::tuple<Pos,Char,Char,Char> base_type;
     typedef Char                           char_type;
+    typedef Pos                            pos_type;
     typedef std::vector<TrigramImpl>       vec_type;
     constexpr static TGImpl                impl = TGImpl::tuple;
   
@@ -74,6 +75,7 @@ namespace sux {
   {
     typedef std::tuple<Pos,std::array<Char,3>> base_type;
     typedef Char                               char_type;
+    typedef Pos                                pos_type;
     typedef std::vector<TrigramImpl>           vec_type;
     constexpr static TGImpl                    impl = TGImpl::arraytuple;
 
@@ -98,6 +100,7 @@ namespace sux {
   {
     typedef Char *                   base_type;
     typedef Char                     char_type;
+    typedef Pos                      pos_type;
     typedef std::vector<TrigramImpl> vec_type;
     constexpr static TGImpl          impl = TGImpl::pointer;
 
@@ -147,7 +150,8 @@ namespace sux {
   static typename TrigramT::char_type triget3(const TrigramT &tri) { return tri.get3(); }
 
   /** The container type for trigram lists. */
-  template <typename TrigramT> struct TrigramContainer { typedef std::vector<TrigramT> vec_type; };
+  template <typename TrigramT> struct TrigramContainer
+  { typedef rlxutil::parallel_vector<TrigramT> vec_type; };
 
   template <TGImpl tgimpl, typename Char, typename Pos>
   struct TrigramMaker
@@ -254,69 +258,6 @@ namespace sux {
     typedef std::map<Char,Pos>  CharDistribution;
 
     /**
-     * Generate frequency table for the text [from,to).
-     */
-    template <typename Iterator, typename CharExtractor, typename Mapping = CharDistribution>
-    static Mapping generate_freq_table(Iterator from, Iterator to, CharExtractor extractor)
-    {
-      Mapping freq_table {};
-      std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
-        ++freq_table[extractor(elem)];
-      });
-      return freq_table;
-    }
-
-    /**
-     * Transform a character frequency table into an accumulated
-     * frequency table, in-place.
-     *
-     * The Mapping data type may be any data type that provides a
-     * default iterator that dereferences to CharFrequency.
-     */
-    template <typename Mapping>
-    static void accumulate_frequencies(Mapping &freq_table)
-    {
-      Pos total {};
-      for (auto &cf : freq_table) {
-        std::swap(total,cf.second);
-        total += cf.second;
-      }
-    }
-
-    /**
-     * Determine the alphabet of characters used in a sequence, count the number
-     * of occurrences of each, and provide accumulated counts. The result is an
-     * ordered map from char to accumulated-count. The accumulated count
-     * if the sum of the counts of all previous characters, NOT including the
-     * present character itself. The order of characters is the one defined by the
-     * ordering of the map (std::less<Char> by default).
-     * The datatype used to represent frequency values is Pos.
-     *
-     * The CharExtractor should be a function type. It is applied to every element of
-     * the sequence to extract a character from it.
-     */
-    template <typename Iterator, typename CharExtractor>
-    static CharDistribution accumulated_charcounts(Iterator from, Iterator to, CharExtractor extractor)
-    {
-      /* Count character frequencies. */
-      CharDistribution freq_table { generate_freq_table(from,to,extractor) };
-      /* Generate accumulated distribution. */
-      accumulate_frequencies(freq_table);
-      /* Return results. */
-      return freq_table;
-    }
-
-    /**
-     * Version of <code>determine_chardistribution()</code> that uses const identity as
-     * char-extractor, i.e. it assumes the input sequence is a sequence of characters.
-     */
-    template <typename Iterator>
-    static CharDistribution accumulated_charcounts(Iterator from, Iterator to)
-    {
-      return accumulated_charcounts(from,to,cid<typename std::iterator_traits<Iterator>::value_type>);
-    }
-
-    /**
      * Perform a bucket-sort of the elements in the range [from,to), using the
      * given extractor to determine the sorting criterion. The result will
      * be sorted into to_vec. to_vec must be resize()'ed by the caller
@@ -325,28 +266,6 @@ namespace sux {
      */
     template <typename Iterator, typename CharExtractor, typename Elem>
     static void bucket_sort(
-        Iterator           from,
-        Iterator           to,
-        CharExtractor      extractor,
-        CharDistribution  &bucket_sizes,
-        std::vector<Elem> &to_vec)
-    {
-      while (from != to)
-      {
-        to_vec[bucket_sizes[extractor(*from)]++] = *from;
-        ++from;
-      }
-    }
-
-    /**
-     * Perform a bucket-sort of the elements in the range [from,to), using the
-     * given extractor to determine the sorting criterion. The result will
-     * be sorted into to_vec. to_vec must be resize()'ed by the caller
-     * before the call. bucket_sizes must be prepared by the caller so it
-     * provides the size of each bucket.
-     */
-    template <typename Iterator, typename CharExtractor, typename Elem>
-    static void bucket_sort2(
         Iterator           from,
         Iterator           to,
         CharExtractor      extractor,
@@ -360,156 +279,8 @@ namespace sux {
       }
     }
 
-    /**
-     * Sort trigrams lexicographically. Any of the specializations of `TrigramImpl`
-     * can be used to represent trigrams. The sorting operation is performed
-     * in three passes of radix sort.
-     */
-    template <template <class,class> class Container, typename TrigramType, typename Alloc>
-    static void sort_23trigrams(Container<TrigramType,Alloc> &trigrams)
-    {
-      /* Extractor function for the third character of every trigram. */
-      auto extractor3 = [](const TrigramType &trigram) { return triget3(trigram); };
-      /* Determine the alphabet and distribution of trigram-final characters. */
-      CharDistribution bucket_sizes {
-        accumulated_charcounts(begin(trigrams),end(trigrams),extractor3)
-      };
-      /* Radix sort, first pass. */
-      Container<TrigramType,Alloc> temp_vec {};
-      temp_vec.resize(trigrams.size());
-      bucket_sort(begin(trigrams),end(trigrams),extractor3,bucket_sizes,temp_vec);
-      std::swap(trigrams,temp_vec);
-      /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor2 = [](const TrigramType &trigram) { return triget2(trigram); };
-      bucket_sizes = accumulated_charcounts(
-          std::begin(trigrams),std::end(trigrams),extractor2);
-      bucket_sort(begin(trigrams),end(trigrams),extractor2,bucket_sizes,temp_vec);
-      std::swap(trigrams,temp_vec);
-      /* Fresh bucket size calculation and radix sort, second pass. */
-      auto extractor1 = [](const TrigramType &trigram) { return triget1(trigram); };
-      bucket_sizes = accumulated_charcounts(begin(trigrams),end(trigrams),extractor1);
-      bucket_sort(begin(trigrams),end(trigrams),extractor1,bucket_sizes,temp_vec);
-      std::swap(trigrams,temp_vec);
-    }
-
-    /**
-     * Perform one pass of radix sort for trigrams, using the specified number
-     * of parallel threads.
-     */
-    template <template <class,class> class Container, typename TrigramType, typename Extractor, typename Alloc>
-    static void sort_23trigrams_one_pass(
-        const Container<TrigramType,Alloc> &trigrams,
-        Container<TrigramType,Alloc>       &dest_vec,
-        Extractor                           extractor,
-        const unsigned                      threads)
-    {
-      /* Determine start and end positions of each thread. */
-      typedef typename Container<TrigramType,Alloc>::const_iterator It;
-      const std::size_t portion { trigrams.size() / threads };
-      std::vector<std::pair<It,It>> offsets(threads);
-      It endpos { begin(trigrams) };
-      std::generate(begin(offsets),end(offsets),[&endpos,portion]() {
-        It startpos { endpos };
-        endpos += portion;
-        return std::make_pair(startpos,endpos);
-      });
-      offsets.back().second = end(trigrams);
-
-      /* Use thread to determine the alphabet and distribution of
-       * extracted characters. */
-      std::vector<std::future<CharDistribution>> frqtab_future_vec {};
-      for (const std::pair<It,It> &offset : offsets)
-      {
-        /* Character frequency count for each thread. */
-        std::future<CharDistribution> fut {
-          std::async(std::launch::async,
-              generate_freq_table<It,Extractor,CharDistribution>,
-              offset.first,offset.second,extractor)
-        };
-        frqtab_future_vec.push_back(std::move(fut));
-      }
-
-      /* Initialise cumulative frequencies per thread. This will
-       * be filled with the correct values later. */
-      std::vector<CharDistribution> tl_cumul_frqtab_vec {};
-
-      /* Total frequency, for each character. */
-      CharDistribution cumul_frqtab {};
-      for (auto &it : frqtab_future_vec)
-      {
-        /* Move the thread-local frequency table out
-         * of its future. */
-        CharDistribution tl_frqtab { it.get() };
-        /* Update the total frequency table. */
-        for (const CharFrequency &entry : tl_frqtab)
-          cumul_frqtab[entry.first] += entry.second;
-        /* Move thread-local frequency table to the end of the
-         * thread-local cumulative frequency table list. Note
-         * that the frequencies are not really cumulative yet;
-         * this will be corrected later. */
-        tl_cumul_frqtab_vec.push_back(std::move(tl_frqtab));
-      }
-
-      /* Cumulate the entries of the global frequency table. */
-      accumulate_frequencies(cumul_frqtab);
-
-      /* Correct the cumulative thread-local frequencies. */
-      for (CharDistribution &tl_frqtab : tl_cumul_frqtab_vec) {
-        /* Swap with current version of global cumulative
-         * frequency table. */
-        std::swap(cumul_frqtab,tl_frqtab);
-        /* Add local character frequencies of current thread to
-         * new version of global table. */
-        for (const CharFrequency &entry : tl_frqtab)
-          cumul_frqtab[entry.first] += entry.second;
-      }
-      /* Radix-sorting threads. */
-      std::vector<std::future<void>> sort_future_vec;
-      auto tl_cumul_frqtab = tl_cumul_frqtab_vec.begin();
-      for (const std::pair<It,It> &offset : offsets)
-      {
-        sort_future_vec.push_back(std::async(std::launch::async,
-            bucket_sort<It,Extractor,TrigramType>,
-            offset.first,offset.second,extractor,ref(*tl_cumul_frqtab),ref(dest_vec)));
-        ++tl_cumul_frqtab;
-      }
-      for (auto &sort_future : sort_future_vec)
-        sort_future.get();
-    }
-
     template<AlphabetClass alphabetclass = AlphabetClass::sparse>
     struct AlphabetSpecific;
-
-    /**
-     * Sort trigrams lexicographically, using the specified number of threads.
-     * Any of the specializations of `TrigramImpl` can be used to represent
-     * trigrams. The sorting operation is performed in three passes of radix sort.
-     */
-    template <template <class,class> class Container, typename TrigramType, typename Alloc>
-    static void sort_23trigrams(
-        Container<TrigramType,Alloc> &trigrams,
-        const unsigned                threads)
-    {
-      /* Sanity. */
-      if (threads < 1)
-        sort_23trigrams(trigrams,1);
-      /* Make sure we don't create too many threads. */
-      const std::size_t total { trigrams.size() };
-      if ((threads > 1) && (total/threads < 1000))
-        sort_23trigrams(trigrams,(total/1000==0?1:total/1000));
-
-      /* Vector for intermediate results. */
-      Container<TrigramType,Alloc> temp_vec(trigrams.size());
-      /* First pass. */
-      sort_23trigrams_one_pass(trigrams,temp_vec,triget3<TrigramType>,threads);
-      swap(trigrams,temp_vec);
-      /* Second pass. */
-      sort_23trigrams_one_pass(trigrams,temp_vec,triget2<TrigramType>,threads);
-      swap(trigrams,temp_vec);
-      /* Third pass. */
-      sort_23trigrams_one_pass(trigrams,temp_vec,triget1<TrigramType>,threads);
-      swap(trigrams,temp_vec);
-    }
 
   };
 
@@ -581,7 +352,7 @@ namespace sux {
 
       /* Radix-sorting threads. */
       auto sort_fut_vec = trigrams.parallel_apply_generate_args
-          (base::bucket_sort2<It,Extractor,TrigramType>,
+          (base::bucket_sort<It,Extractor,TrigramType>,
            arg_generator(
                [&cumul_frqtab_vec,&dest_vec,&extractor](int thread)
            {
@@ -620,12 +391,29 @@ namespace sux {
         begin(str),end(str));
   }
 
-  template <template <class,class> class Container, TGImpl tgimpl, typename Char, typename Pos, typename Alloc>
-  void sort_23trigrams(
-      Container<TrigramImpl<tgimpl,Char,Pos>,Alloc> &trigrams,
-      const unsigned threads = 1)
+/* This version of sort_23trigrams is commented out as it causes
+ * an internal compiler error with GCC. */
+//  template <AlphabetClass alphaclass, typename... Args>
+//  void sort_23trigrams(
+//      rlxutil::parallel_vector<Args...> &trigrams)
+//  {
+//    typedef rlxutil::parallel_vector<Args...> vec_type;
+//    typedef typename vec_type::value_type     trigram_type;
+//    typedef typename trigram_type::char_type  char_type;
+//    typedef typename trigram_type::pos_type   pos_type;
+//
+//    TrigramSorter<char_type,pos_type>::template AlphabetSpecific<alphaclass>::sort_23trigrams(trigrams);
+//  }
+
+  template <AlphabetClass alphaclass, typename ParVector>
+  void sort_23trigrams(ParVector &trigrams)
   {
-    TrigramSorter<Char,Pos>::sort_23trigrams(trigrams,threads);
+    typedef ParVector vec_type;
+    typedef typename vec_type::value_type     trigram_type;
+    typedef typename trigram_type::char_type  char_type;
+    typedef typename trigram_type::pos_type   pos_type;
+
+    TrigramSorter<char_type,pos_type>::template AlphabetSpecific<alphaclass>::sort_23trigrams(trigrams);
   }
 
 }
