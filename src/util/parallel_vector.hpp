@@ -46,6 +46,17 @@ namespace rlxutil {
               && is_instance_of<std::tuple,typename function_traits<Fun>::result_type>::value
           );
     };
+
+    /**
+     * Given a vector of futures, wait for all results to become available.
+     */
+    template <typename... Args>
+    static void wait_for_results(const std::vector<std::future<Args...>> &futs)
+    {
+      for (auto &fut : futs)
+        fut.wait();
+    }
+
   }
 
   template <typename Elem, unsigned min_portion = 1000, typename Alloc = std::allocator<Elem>>
@@ -139,11 +150,11 @@ namespace rlxutil {
 
       typedef typename std::result_of<Fun(It,It,Args...)>::type result_type;
 
-      LOG(DEBUG) << "Running parallel_perform without generator";
-
       if (_offsets.size() != threads)
         parallelize(threads);
 
+      DLOG(INFO) << "Running parallel_perform without generator, using "
+          << _offsets.size() << " threads";
       vector<future<result_type>> results
       { };
 
@@ -188,11 +199,11 @@ namespace rlxutil {
 
       typedef typename function_traits<Fun>::result_type result_type;
 
-      LOG(DEBUG) << "Running parallel_perform with generator";
-
       if (_offsets.size() != threads)
         parallelize(threads);
 
+      DLOG(INFO) << "Running parallel_perform with generator, using "
+          << _offsets.size() << " threads";
       vector<future<result_type>> results
       { };
 
@@ -539,6 +550,24 @@ namespace rlxutil {
       _offsets.back().second = _data.end();
     }
   };
+
+  namespace parallel_vector_tools {
+
+    /**
+     * Make a parallel vector of the same type and size and number of
+     * threads as the given one.
+     */
+    template <typename Elem, unsigned min_portion, typename Alloc>
+    parallel_vector<Elem,min_portion,Alloc>
+    make_same_size_vector(const parallel_vector<Elem,min_portion,Alloc> &vec)
+    {
+      auto new_vec = parallel_vector<Elem,min_portion,Alloc>(vec.size());
+      new_vec.num_threads(vec.num_threads());
+      return new_vec;
+    }
+
+  }
+
 }
 
 
