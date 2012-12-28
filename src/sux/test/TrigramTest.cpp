@@ -239,17 +239,107 @@ void perform_multi_threaded_trigram_sorting()
   BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
 }
 
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_tuple)
+//BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_tuple)
+//{
+//  perform_multi_threaded_trigram_sorting<sux::TGImpl::tuple>();
+//}
+//
+//BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_arraytuple)
+//{
+//  perform_multi_threaded_trigram_sorting<sux::TGImpl::arraytuple>();
+//}
+//
+//BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_pointer)
+//{
+//  perform_multi_threaded_trigram_sorting<sux::TGImpl::pointer>();
+//}
+
+template <sux::TGImpl tgimpl>
+rlxutil::parallel_vector<typename sux::TrigramMaker<tgimpl,char,Pos>::trigram_type,1>
+make_boundary_adjustment_testinput()
 {
-  perform_multi_threaded_trigram_sorting<sux::TGImpl::tuple>();
+  typedef typename sux::TrigramMaker<tgimpl,char,Pos>::trigram_type elem_type;
+  return {
+    elem_type { 3,'a','e','c' },
+    elem_type { 2,'c','a','e' },
+    elem_type { 5,'c','a','f' },
+    elem_type { 1,'e','c','a' },
+    elem_type { 4,'e','c','a' }
+  };
 }
 
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_arraytuple)
+template <>
+rlxutil::parallel_vector<typename sux::TrigramMaker<sux::TGImpl::pointer,char,Pos>::trigram_type,1>
+make_boundary_adjustment_testinput<sux::TGImpl::pointer>()
 {
-  perform_multi_threaded_trigram_sorting<sux::TGImpl::arraytuple>();
+  typedef typename sux::TrigramMaker<sux::TGImpl::pointer,char,Pos>::trigram_type elem_type;
+  return {
+    elem_type { "aec" },
+    elem_type { "cae" },
+    elem_type { "caf" },
+    elem_type { "eca" },
+    elem_type { "eca" }
+  };
 }
 
-BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_pointer)
+template <sux::TGImpl tgimpl>
+void perform_boundary_adjustment_test()
 {
-  perform_multi_threaded_trigram_sorting<sux::TGImpl::pointer>();
+  using rlxutil::parallel_vector;
+  using sux::TrigramMaker;
+  using sux::TGImpl;
+  using sux::trigram_tools::content_equal;
+
+  typedef TrigramMaker<tgimpl,char,Pos>     maker;
+  typedef typename maker::trigram_type      elem_type;
+  typedef parallel_vector<elem_type,1>      vec_type;
+  typedef typename vec_type::const_iterator It;
+
+  vec_type vec
+  { make_boundary_adjustment_testinput<tgimpl>() };
+
+  vec.num_threads(5);
+  auto actual =
+      vec.get_thread_boundaries();
+  typename vec_type::const_iterator beg
+  { vec.begin() };
+  decltype(actual) expected
+  {
+    { beg     , beg+1 },
+    { beg + 1 , beg+2 },
+    { beg + 2 , beg+3 },
+    { beg + 3 , beg+4 },
+    { beg + 4 , beg+5 }
+  };
+  BOOST_CHECK((actual.size() == expected.size()
+      && (equal(begin(actual),end(actual),begin(expected)))));
+
+  vec.thread_boundary_adjustment(
+      [](It /*beg*/,It it,It end)
+      {
+        if (it != end) {
+          It nx = next(it);
+          if ((nx != end) && content_equal(*it,*nx))
+            return vec_type::adjustment::needed;
+        }
+        return vec_type::adjustment::unneeded;
+      });
+
+  actual   = vec.get_thread_boundaries();
+  expected =
+  {
+    { beg     , beg+1 },
+    { beg + 1 , beg+2 },
+    { beg + 2 , beg+3 },
+    { beg + 3 , beg+5 }
+  };
+  BOOST_CHECK((actual.size() == expected.size()
+      && (equal(begin(actual),end(actual),begin(expected)))));
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_boundary_adjustment)
+{
+  perform_boundary_adjustment_test<sux::TGImpl::tuple>();
+  perform_boundary_adjustment_test<sux::TGImpl::arraytuple>();
+  perform_boundary_adjustment_test<sux::TGImpl::pointer>();
 }

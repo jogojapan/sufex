@@ -14,6 +14,8 @@
 #include <utility>
 #include <type_traits>
 #include <future>
+#include <functional>
+#include <cstddef>
 
 #include <glog/logging.h>
 
@@ -59,7 +61,7 @@ namespace rlxutil {
 
   }
 
-  template <typename Elem, unsigned min_portion = 1000, typename Alloc = std::allocator<Elem>>
+  template <typename Elem, std::size_t min_portion = 1000, typename Alloc = std::allocator<Elem>>
   class parallel_vector
   {
   public:
@@ -279,6 +281,65 @@ namespace rlxutil {
       using std::forward;
       std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
       return _parallel_apply_generate_args(threads,forward<Fun>(fun),gen);
+    }
+
+    /**
+     * Return values for boundary adjustment functions. (See
+     * `thread_boundary_adjustment()`.)
+     */
+    enum class adjustment : bool
+    { unneeded , needed };
+
+    /**
+     * Type of the thread-boundary adjustment function. (See
+     * `thread_boundary_adjustment()`.)
+     */
+    typedef std::function<adjustment(It,It,It)> boundary_adjuster_t;
+
+    /** Set the function used to determine whether any given offset (i.e.
+     * the boundary between two adjacent threads) must be adjusted.
+     * Given arguments `(beg,it,end)`, the function should return
+     * adjustment::needed if the offset represented by the iterator
+     * `it` is not a valid thread boundary. It will then adjusted
+     * rightward in steps of 1 until the function returns
+     * adjustment::unneeded. `beg` and `end` are constant iterators
+     * to the beginning and end of the internal vector, which
+     * the function may use for checking purposes (e.g. adjustment
+     * may be needed when `(it+1)` has certain properties, but
+     * to be ablet o check this, the function must first check
+     * that `(it+1)` is not equal to `end`. Note that the function
+     * needs **not** check whether `it` itself is equal to `end`.
+     * It can suggest adjustment even if it is; the adjustment will
+     * then not be carried out, however (there is an automatic
+     * boundary check built into the boundary adjustment routine). */
+    void thread_boundary_adjustment(const boundary_adjuster_t &boundary_adjuster)
+    {
+      /* Set the function. */
+      _boundary_adjuster = boundary_adjuster;
+      /* Re-configure the offsets for all threads. */
+      parallelize(num_threads());
+    }
+
+    /**
+     * Move-in a boundary adjustment function.
+     */
+    void thread_boundary_adjustment(boundary_adjuster_t &&boundary_adjuster)
+    {
+      /* Set the function. */
+      _boundary_adjuster = std::move(boundary_adjuster);
+      /* Re-configure the offsets for all threads. */
+      parallelize(num_threads());
+    }
+
+    /**
+     * Unset the boundary adjuster.
+     */
+    void thread_boundary_adjustment(std::nullptr_t boundary_adjuster = nullptr)
+    {
+      /* Set the function. */
+      _boundary_adjuster = nullptr;
+      /* Re-configure the offsets for all threads. */
+      parallelize(num_threads());
     }
 
     void assign(size_type count, const Elem &value)
@@ -519,16 +580,37 @@ namespace rlxutil {
 
   private:
     /** Internal storage. */
-    std::vector<Elem,Alloc>        _data;
+    std::vector<Elem,Alloc>       _data;
     /** Start and end offsets for threads. Note that the standard
      * allocator (not Alloc) is **always** used for this vector. */
-    std::vector<std::pair<It,It>>  _offsets;
+    std::vector<std::pair<It,It>> _offsets;
+    /** Function used to determine whether any given offset (i.e.
+     * the boundary between two adjacent threads) must be adjusted.
+     * Given arguments `(beg,it,end)`, the function should return
+     * adjustment::needed if the offset represented by the iterator
+     * `it` is not a valid thread boundary. It will then adjusted
+     * rightward in steps of 1 until the function returns
+     * adjustment::unneeded. `beg` and `end` are constant iterators
+     * to the beginning and end of the internal vector, which
+     * the function may use for checking purposes (e.g. adjustment
+     * may be needed when `(it+1)` has certain properties, but
+     * to be ablet o check this, the function must first check
+     * that `(it+1)` is not equal to `end`. Note that the function
+     * needs **not** check whether `it` itself is equal to `end`.
+     * It can suggest adjustment even if it is; the adjustment will
+     * then not be carried out, however (there is an automatic
+     * boundary check built into the boundary adjustment routine). */
+    boundary_adjuster_t           _boundary_adjuster;
 
     /**
      * Calculate the start and end offsets for all threads.
      */
     void parallelize(const std::size_t threads)
     {
+      using std::pair;
+      using std::make_pair;
+      using std::distance;
+
       /* Sanity. */
       if (threads < 1)
         parallelize(1);
@@ -543,18 +625,64 @@ namespace rlxutil {
 
       _offsets.resize(threads);
 
-      It endpos
-      { _data.begin() };
+      /* Const-reference to _data. This is so the begin() and
+       * end() function return const iterators to ensure we don't
+       * get in conflict with variables of type It. */
+      const decltype(_data) &data = _data;
 
-      std::generate(_offsets.begin(),_offsets.end(),[&endpos,portion]()
-      {
-        It startpos
-        { endpos };
-        endpos += portion;
-        return std::make_pair(startpos,endpos);
-      });
+      It endpos
+      { data.begin() };
+
+      if (_boundary_adjuster) {
+        std::generate(_offsets.begin(),_offsets.end(),[&endpos,portion,&data,this]()
+        {
+          It startpos
+          { endpos };
+
+          /* Calculate how many items are left in the vector. This may be
+           * less than a full portion, due to boundary adjustments.
+           * Note: The below involves a cast from signed (difference_type) to
+           * unsigned. */
+          std::size_t remainder = distance(startpos,data.end());
+          if (remainder < portion)
+            return make_pair(startpos,startpos + remainder);
+          endpos += (portion - 1);
+          while ((endpos != data.end())
+              && (_boundary_adjuster(data.begin(),endpos,data.end()) == adjustment::needed))
+            ++endpos;
+          ++endpos;
+          return make_pair(startpos,endpos);
+        });
+
+        /* As a result of boundary adjustments, their may be empty thread portions
+         * at the end of the _offsets vector. We remove them. */
+        auto last_non_empty =
+            std::find_if(_offsets.rbegin(),_offsets.rend(),[](const pair<It,It> &p)
+                { return (distance(p.first,p.second) != 0); });
+        _offsets.erase(last_non_empty.base(),_offsets.end());
+      }
+      else
+        std::generate(_offsets.begin(),_offsets.end(),[&endpos,portion]()
+        {
+          It startpos
+          { endpos };
+          endpos += portion;
+          return std::make_pair(startpos,endpos);
+        });
+
       _offsets.back().second = _data.end();
     }
+
+  public:
+    /**
+     * Access to the threads-boundaries vector. This is used by unit
+     * tests to inspect the inner state of the parallel vector.
+     * There shouldn't usually be a need for ordinary users to
+     * call this function.
+     */
+    auto get_thread_boundaries() const -> const decltype(this->_offsets) &
+    { return _offsets; }
+
   };
 
   namespace parallel_vector_tools {
@@ -568,6 +696,19 @@ namespace rlxutil {
     make_same_size_vector(const parallel_vector<Elem,min_portion,Alloc> &vec)
     {
       auto new_vec = parallel_vector<Elem,min_portion,Alloc>(vec.size());
+      new_vec.num_threads(vec.num_threads());
+      return new_vec;
+    }
+
+    /**
+     * Make a parallel vector of a different type, but same size and
+     * number of threads as the given one.
+     */
+    template <typename NewElem, typename Elem, unsigned min_portion, typename Alloc>
+    parallel_vector<Elem,min_portion,Alloc>
+    make_same_size_vector_of(const parallel_vector<Elem,min_portion,Alloc> &vec)
+    {
+      auto new_vec = parallel_vector<NewElem,min_portion,Alloc>(vec.size());
       new_vec.num_threads(vec.num_threads());
       return new_vec;
     }
