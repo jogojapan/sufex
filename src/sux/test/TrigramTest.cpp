@@ -152,10 +152,10 @@ BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
 
 BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
 {
-  using rlxutil::parallel_vector;
+  using rlxutil::parallel::portions;
 
   const std::basic_string<Char> input { (const Char *)"aecabfgc" };
-  parallel_vector<SATrigram> expected
+  std::vector<SATrigram> expected
   {
     SATrigram { 4,'b','f','g' },
     SATrigram { 2,'c','a','b' },
@@ -163,10 +163,9 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
     SATrigram { 5,'f','g','c' }
   };
 
-  parallel_vector<SATrigram> actual
-  { SAMaker::make_23trigrams(begin(input),end(input)) };
+  auto actual = SAMaker::make_23trigrams(begin(input),end(input));
 
-  SSorter::AlphabetSpecific<sux::AlphabetClass::sparse>::sort_23trigrams(actual);
+  SSorter::AlphabetSpecific<sux::AlphabetClass::sparse>::sort_23trigrams(actual,1);
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -183,7 +182,6 @@ void perform_multi_threaded_trigram_sorting()
       << sux::repr<tgimpl>::str
       << " trigram implementation";
 
-  using rlxutil::parallel_vector;
   using sux::sort_23trigrams;
   using sux::AlphabetClass;
 
@@ -201,16 +199,13 @@ void perform_multi_threaded_trigram_sorting()
   typedef sux::TrigramMaker<tgimpl,Char,LPos>     TrigramMaker;
   typedef typename TrigramMaker::trigram_type     Trigram;
 
-  parallel_vector<Trigram> actual
-  { TrigramMaker::make_23trigrams(begin(input),end(input)) };
+  auto actual = TrigramMaker::make_23trigrams(begin(input),end(input));
   /* Make a copy of the trigrams, which will later be sorted them separately. */
-  parallel_vector<Trigram> expected
-  { actual };
+  auto expected = actual;
 
   /* Trigam sort. */
-  actual.num_threads(4);
   auto tp1 = rlxutil::combined_clock<std::micro>::now();
-  sort_23trigrams<AlphabetClass::sparse>(actual);
+  sort_23trigrams<AlphabetClass::sparse>(actual,4);
   auto tp2 = rlxutil::combined_clock<std::micro>::now();
   /* Alternative trigram sort, as reference. */
   auto tp3 = rlxutil::combined_clock<std::micro>::now();
@@ -285,36 +280,35 @@ make_boundary_adjustment_testinput<sux::TGImpl::pointer>()
 template <sux::TGImpl tgimpl>
 void perform_boundary_adjustment_test()
 {
-  using rlxutil::parallel_vector;
   using sux::TrigramMaker;
   using sux::TGImpl;
   using sux::trigram_tools::content_equal;
 
-  typedef TrigramMaker<tgimpl,char,Pos>     maker;
-  typedef typename maker::trigram_type      elem_type;
-  typedef parallel_vector<elem_type,1>      vec_type;
+  typedef TrigramMaker<tgimpl,char,Pos> maker;
+  typedef typename maker::trigram_type  elem_type;
+  typedef std::vector<elem_type>        vec_type;
   typedef typename vec_type::const_iterator It;
 
   vec_type vec
   { make_boundary_adjustment_testinput<tgimpl>() };
 
-  vec.num_threads(5);
-  auto actual =
-      vec.get_thread_boundaries();
+  rlxutil::parallel::portions portions
+  { begin(vec),end(vec),1,5 };
+  auto actual = portions.get_boundaries();
   typename vec_type::const_iterator beg
   { vec.begin() };
   decltype(actual) expected
   {
-    { beg     , beg+1 },
-    { beg + 1 , beg+2 },
-    { beg + 2 , beg+3 },
-    { beg + 3 , beg+4 },
-    { beg + 4 , beg+5 }
+    { 0 , 1 },
+    { 1 , 2 },
+    { 2 , 3 },
+    { 3 , 4 },
+    { 4 , 5 }
   };
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 
-  vec.thread_boundary_adjustment(
+  portions.thread_boundary_adjustment(
       [](It /*beg*/,It it,It end)
       {
         if (it != end) {
@@ -325,13 +319,13 @@ void perform_boundary_adjustment_test()
         return vec_type::adjustment::unneeded;
       });
 
-  actual   = vec.get_thread_boundaries();
+  actual   = portions.get_boundaries();
   expected =
   {
-    { beg     , beg+1 },
-    { beg + 1 , beg+2 },
-    { beg + 2 , beg+3 },
-    { beg + 3 , beg+5 }
+    { 0 , 1 },
+    { 1 , 2 },
+    { 2 , 3 },
+    { 3 , 5 }
   };
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
@@ -342,4 +336,52 @@ BOOST_AUTO_TEST_CASE(sux_builder_boundary_adjustment)
   perform_boundary_adjustment_test<sux::TGImpl::tuple>();
   perform_boundary_adjustment_test<sux::TGImpl::arraytuple>();
   perform_boundary_adjustment_test<sux::TGImpl::pointer>();
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_lexicographical_renaming)
+{
+  /* Lexicographical renaming is tested only for one particular
+   * implemenatation of trigrams, `TGImpl::pointer`, because
+   * tests for this are the easiest to code. Aspects of the
+   * other implementations that would affect lexicographical
+   * renaming are assumed to be covered by other tests. */
+
+  typedef sux::TrigramMaker<sux::TGImpl::pointer,char,Pos>   maker;
+  typedef typename maker::trigram_type                       elem_type;
+  std::vector<elem_type> input {
+    elem_type { "aec" },
+    elem_type { "aef" },
+    elem_type { "bhj" },
+    elem_type { "bhj" },
+    elem_type { "bhj" },
+    elem_type { "bhj" },
+    elem_type { "dkh" },
+    elem_type { "dnr" },
+    elem_type { "dnr" },
+    elem_type { "dnr" },
+    elem_type { "eca" },
+    elem_type { "eca" },
+    elem_type { "eca" },
+    elem_type { "eca" },
+    elem_type { "eca" },
+    elem_type { "kuw" },
+    elem_type { "kuw" },
+    elem_type { "lpp" },
+    elem_type { "lpy" },
+    elem_type { "qqq" },
+    elem_type { "qxz" },
+    elem_type { "rst" },
+    elem_type { "rsu" },
+    elem_type { "rua" },
+    elem_type { "rub" },
+    elem_type { "ruc" }
+  };
+
+  std::vector<Pos> expected
+  { 0,1,2,2,2,2,3,4,4,4,5,5,5,5,5,6,6,7,8,9,10,11,12,13,14,15 };
+
+  typedef sux::lexicographical_renaming<decltype(input)> lex;
+
+  auto renamed_vec = sux::rename_lexicographically(input);
+  BOOST_CHECK(equal(begin(expected),end(expected),begin(lex::newstring_of(renamed_vec))));
 }

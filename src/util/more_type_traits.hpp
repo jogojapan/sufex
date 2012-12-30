@@ -23,6 +23,31 @@ namespace rlxutil {
   { static constexpr bool value = true; };
 
   /**
+   * Use this to compute, at compile time, the type of the result of
+   * dereferencing an expression of type `T`. This works with pointers,
+   * iterators and anything that has a unary `operator*`.
+   */
+  template <typename T>
+  struct deref
+  { typedef typename std::remove_reference<decltype(*(std::declval<T>()))>::type type; };
+
+  /**
+   * Use this to check, at compile time, whether an assignment `T1 = T2;`
+   * is possible without loosing information. This will only work for
+   * fundamental data types. It basically checks whether `T1` is identical
+   * to `T2`. (`std::is_convertible` wouldn't be good for this because
+   * it yields true even when the assignment of a value of `T2` to one of
+   * `T1` would cause information loss.)
+   */
+  template <typename T1, typename T2>
+  struct is_compatible
+  {
+    typedef typename std::decay<T1>::type t1;
+    typedef typename std::decay<T2>::type t2;
+    static constexpr bool value = std::is_same<t1,t2>::value;
+  };
+
+  /**
    * Provide traits for functions, including lambda expressions and
    * member function pointers. This specialization is for lambda expressions.
    * Note that lambda expressions have a member-operator(). We take the

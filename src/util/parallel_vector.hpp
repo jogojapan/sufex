@@ -61,6 +61,28 @@ namespace rlxutil {
 
   }
 
+  /**
+   * The parallel_vector implementation exists for constant as well as
+   * mutable (variable) iteration.
+   */
+  enum class parvec
+  { constant , variable };
+
+  /**
+   * Implementation of the iterator type, depending on the implementation
+   * parameter (constant vs. variable).
+   */
+  template <parvec, typename... Types>
+  struct parvec_iterator;
+
+  template <typename... Types>
+  struct parvec_iterator<parvec::constant,Types...>
+  { typedef typename std::vector<Types...>::const_iterator It; };
+
+  template <typename... Types>
+  struct parvec_iterator<parvec::variable,Types...>
+  { typedef typename std::vector<Types...>::iterator It; };
+
   template <typename Elem, std::size_t min_portion = 1000, typename Alloc = std::allocator<Elem>>
   class parallel_vector
   {
@@ -82,7 +104,7 @@ namespace rlxutil {
     typedef typename std::vector<Elem,Alloc>::const_reverse_iterator const_reverse_iterator;
 
   private:
-    typedef const_iterator It;
+    typedef difference_type diff_t;
 
   public:
     parallel_vector() :
@@ -132,11 +154,9 @@ namespace rlxutil {
     void num_threads(std::size_t threads)
     { parallelize(threads); }
 
-  private:
     /**
      * Apply a function to all elements of the vector, running multiple
      * threads in parallel.
-     * @parameter threads The number of threads to be used
      * @parameter fun The function to be applied. The function must take
      *   at least two `const_iterator` arguments, specifying the range
      *   of elements to which it will be applied. It can optionally take
@@ -148,7 +168,7 @@ namespace rlxutil {
      */
     template <typename Fun, typename... Args>
     std::vector<typename std::future<typename std::result_of<Fun(It,It,Args...)>::type>>
-    _parallel_apply(std::size_t threads, Fun&& fun, Args&&... args)
+    parallel_apply(Fun&& fun, Args&&... args)
     {
       using std::pair;
       using std::vector;
@@ -158,18 +178,21 @@ namespace rlxutil {
 
       typedef typename std::result_of<Fun(It,It,Args...)>::type result_type;
 
-      if (_offsets.size() != threads)
-        parallelize(threads);
+      if (_offsets.empty())
+        parallelize(1);
 
       DLOG(INFO) << "Running parallel_perform without generator, using "
           << _offsets.size() << " threads";
+
       vector<future<result_type>> results
       { };
 
-      for (const pair<It,It> &os : _offsets)
+      const auto beg = _data.begin();
+      for (const pair<diff_t,diff_t> &os : _offsets)
         {
           future<result_type> fut
-          { async(std::launch::async,forward<Fun>(fun),os.first,os.second,forward<Args>(args)...) };
+          { async(std::launch::async,
+              forward<Fun>(fun),beg+os.first,beg+os.second,forward<Args>(args)...) };
           results.push_back(std::move(fut));
         }
 
@@ -179,7 +202,6 @@ namespace rlxutil {
     /**
      * Apply a function to all elements of the vector, running multiple
      * threads in parallel.
-     * @parameter threads The number of threads to be used
      * @parameter fun The function to be applied. The function must take
      *   at least two `const_iterator` arguments, specifying the range
      *   of elements to which it will be applied. It can optionally take
@@ -192,9 +214,8 @@ namespace rlxutil {
      */
     template <typename Fun, typename Generator>
     typename std::enable_if<parallel_vector_tools::is_arg_generator<Generator>::value,
-       std::vector<typename std::future<
-          typename function_traits<Fun>::result_type>>>::type
-    _parallel_apply_generate_args(std::size_t threads, Fun&& fun, Generator gen)
+       std::vector<typename std::future<typename function_traits<Fun>::result_type>>>::type
+    parallel_apply_generate_args(Fun&& fun, Generator gen)
     {
       using std::pair;
       using std::vector;
@@ -207,22 +228,24 @@ namespace rlxutil {
 
       typedef typename function_traits<Fun>::result_type result_type;
 
-      if (_offsets.size() != threads)
-        parallelize(threads);
+      if (_offsets.empty())
+        parallelize(1);
 
       DLOG(INFO) << "Running parallel_perform with generator, using "
           << _offsets.size() << " threads";
+
       vector<future<result_type>> results
       { };
 
       std::size_t counter = 0;
-      for (const pair<It,It> &os : _offsets)
+      const auto beg = _data.begin();
+      for (const pair<diff_t,diff_t> &os : _offsets)
         {
           future<result_type> fut
           {
             async(std::launch::async,
                 [os,counter,&fun,&gen]() {
-                  call_on_tuple(fun,tuple_cat(make_tuple(os.first,os.second),gen(counter)));
+                  call_on_tuple(fun,tuple_cat(make_tuple(beg+os.first,beg+os.second),gen(counter)));
                 })
           };
           results.push_back(std::move(fut));
@@ -230,57 +253,6 @@ namespace rlxutil {
         }
 
       return results;
-    }
-
-  public:
-    /**
-     * Apply a function to all elements of the vector, running multiple
-     * threads in parallel. The number of threads used is the same as was
-     * used in any previous call of `parallel_perform()`, or the number
-     * specified in the last call to `num_threads()`, whichever happened
-     * more recently. If neither function has ever been called on this
-     * instance, the number of threads is 1.
-     * @parameter fun The function to be applied. The function must take
-     *   at least two `const_iterator` arguments, specifying the range
-     *   of elements to which it will be applied. It can optionally take
-     *   further arguments of any type.
-     * @parameter args... Additional arguments to the function
-     */
-    template <typename Fun, typename... Args>
-    std::vector<typename std::future<typename std::result_of<Fun(It,It,Args...)>::type>>
-    parallel_apply(Fun&& fun, Args&&... args)
-    {
-      using std::forward;
-      std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
-      return _parallel_apply(threads,forward<Fun>(fun),forward<Args>(args)...);
-    }
-
-    /**
-     * Apply a function to all elements of the vector, running multiple
-     * threads in parallel. The number of threads used is the same as was
-     * used in the previous call of `parallel_perform()` or
-     * `parallel_perform_generate_args()`, or the number specified in the
-     * most recent call to `num_threads()`, whichever happened more recently.
-     * If neither function has ever been called on this instance, the number
-     * of threads is 1.
-     * @parameter fun The function to be applied. The function must take
-     *   at least two `const_iterator` arguments, specifying the range
-     *   of elements to which it will be applied. It can optionally take
-     *   further arguments of any type.
-     * @parameter gen A lambda function that will be used to generate
-     *   arguments for the call to fun. The lambda must take an integer
-     *   is argument and return a tuple. The integer will be 0 for the
-     *   first thread created, 1 for the second, and so on.
-     */
-    template <typename Fun, typename Generator>
-    typename std::enable_if<parallel_vector_tools::is_arg_generator<Generator>::value,
-       std::vector<typename std::future<
-          typename function_traits<Fun>::result_type>>>::type
-    parallel_apply_generate_args(Fun&& fun, Generator gen)
-    {
-      using std::forward;
-      std::size_t threads = (_offsets.empty() ? 1 : _offsets.size());
-      return _parallel_apply_generate_args(threads,forward<Fun>(fun),gen);
     }
 
     /**
@@ -580,10 +552,10 @@ namespace rlxutil {
 
   private:
     /** Internal storage. */
-    std::vector<Elem,Alloc>       _data;
+    std::vector<Elem,Alloc>                       _data;
     /** Start and end offsets for threads. Note that the standard
      * allocator (not Alloc) is **always** used for this vector. */
-    std::vector<std::pair<It,It>> _offsets;
+    mutable std::vector<std::pair<diff_t,diff_t>> _offsets;
     /** Function used to determine whether any given offset (i.e.
      * the boundary between two adjacent threads) must be adjusted.
      * Given arguments `(beg,it,end)`, the function should return
@@ -600,12 +572,12 @@ namespace rlxutil {
      * It can suggest adjustment even if it is; the adjustment will
      * then not be carried out, however (there is an automatic
      * boundary check built into the boundary adjustment routine). */
-    boundary_adjuster_t           _boundary_adjuster;
+    boundary_adjuster_t                           _boundary_adjuster;
 
     /**
      * Calculate the start and end offsets for all threads.
      */
-    void parallelize(const std::size_t threads)
+    void parallelize(const std::size_t threads) const
     {
       using std::pair;
       using std::make_pair;
@@ -643,34 +615,40 @@ namespace rlxutil {
            * less than a full portion, due to boundary adjustments.
            * Note: The below involves a cast from signed (difference_type) to
            * unsigned. */
-          std::size_t remainder = distance(startpos,data.end());
+          diff_t remainder = distance(startpos,data.end());
           if (remainder < portion)
-            return make_pair(startpos,startpos + remainder);
+            return make_pair(
+                distance(data.begin(),startpos),
+                distance(data.begin(),startpos) + remainder);
           endpos += (portion - 1);
           while ((endpos != data.end())
               && (_boundary_adjuster(data.begin(),endpos,data.end()) == adjustment::needed))
             ++endpos;
           ++endpos;
-          return make_pair(startpos,endpos);
+          return make_pair(
+              distance(data.begin() + startpos),
+              distance(data.begin() + endpos));
         });
 
         /* As a result of boundary adjustments, their may be empty thread portions
          * at the end of the _offsets vector. We remove them. */
         auto last_non_empty =
-            std::find_if(_offsets.rbegin(),_offsets.rend(),[](const pair<It,It> &p)
-                { return (distance(p.first,p.second) != 0); });
+            std::find_if(_offsets.rbegin(),_offsets.rend(),[](const pair<diff_t,diff_t> &p)
+                { return (p.first != p.second); });
         _offsets.erase(last_non_empty.base(),_offsets.end());
       }
       else
-        std::generate(_offsets.begin(),_offsets.end(),[&endpos,portion]()
+        std::generate(_offsets.begin(),_offsets.end(),[&endpos,portion,&data]()
         {
           It startpos
           { endpos };
           endpos += portion;
-          return std::make_pair(startpos,endpos);
+          return make_pair(
+              distance(data.begin() + startpos),
+              distance(data.begin() + endpos));
         });
 
-      _offsets.back().second = _data.end();
+      _offsets.back().second = _data.size();
     }
 
   public:
@@ -705,7 +683,7 @@ namespace rlxutil {
      * number of threads as the given one.
      */
     template <typename NewElem, typename Elem, unsigned min_portion, typename Alloc>
-    parallel_vector<Elem,min_portion,Alloc>
+    parallel_vector<NewElem,min_portion,Alloc>
     make_same_size_vector_of(const parallel_vector<Elem,min_portion,Alloc> &vec)
     {
       auto new_vec = parallel_vector<NewElem,min_portion,Alloc>(vec.size());

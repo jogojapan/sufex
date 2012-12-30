@@ -11,7 +11,7 @@
 #include <type_traits>
 #include <iterator>
 
-#include "../util/parallel_vector.hpp"
+#include "../util/parallelization.hpp"
 
 namespace sux {
 
@@ -31,7 +31,8 @@ namespace sux {
     template <typename FreqTable, typename Iterator, typename CharExtractor>
     static FreqTable make_freq_table(Iterator from, Iterator to, CharExtractor extractor)
     {
-      FreqTable freq_table {};
+      FreqTable freq_table
+      { };
       std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
         ++freq_table[extractor(elem)];
       });
@@ -90,9 +91,9 @@ namespace sux {
     : _highest(highest)
     { }
 
-    typedef Char    char_type;
-    typedef Freq    freq_type;
-    typedef rlxutil::parallel_vector<Freq>  freq_table_type;
+    typedef Char               char_type;
+    typedef Freq               freq_type;
+    typedef std::vector<Freq>  freq_table_type;
 
     /**
      * Adding the character frequencies of the second frequency
@@ -100,16 +101,18 @@ namespace sux {
      * the operation will be parallelised.
      */
     static void add_char_freq_table(
-        freq_table_type &main_table, const freq_table_type &add_table)
+        freq_table_type &main_table, const freq_table_type &add_table, unsigned threads = 4)
     {
       using std::distance;
       using std::size_t;
       using It = typename freq_table_type::iterator;
 
+      rlxutil::parallel::portions portions
+      { begin(main_table), end(main_table), threads };
       const It start
       { main_table.begin() };
 
-      main_table.parallel_apply
+      portions.apply
       ([start,&add_table](It from, It to)
       {
         It src_it
