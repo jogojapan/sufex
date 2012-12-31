@@ -53,7 +53,7 @@ namespace sux {
      * table to those of the first.
      */
     static void add_char_freq_table(
-        freq_table_type &main_table, const freq_table_type &add_table)
+        freq_table_type &main_table, const freq_table_type &add_table, unsigned)
     {
       for (const char_freq_type &entry : add_table)
         main_table[entry.first] += entry.second;

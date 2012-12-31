@@ -317,14 +317,20 @@ namespace sux {
      * Perform one pass of radix sort for trigrams, using the specified number
      * of parallel threads.
      */
-    template <typename It, typename TrigramType, typename Extractor>
+    template <typename It, typename Extractor>
     static void parallel_bucket_sort
     (It from, It to, It dest, Extractor extractor,
         const rlxutil::parallel::portions &portions)
     {
-      using std::make_tuple;
       using std::ref;
+      using std::make_tuple;
+      using rlxutil::deref;
+      using rlxutil::is_compatible;
       using namespace alphabet_tools;
+      using rlxutil::parallel::tools::arg_generator;
+      using rlxutil::parallel::tools::wait_for;
+
+      typedef typename deref<It>::type elem_type;
 
       /* Create a frequency list of characters. */
       auto frqtab_vec = portions.apply
@@ -332,7 +338,7 @@ namespace sux {
 
       /* Initialise cumulative frequencies per thread. This will
        * be filled with the correct values later. */
-      vector<freq_table_type> cumul_frqtab_vec
+      std::vector<freq_table_type> cumul_frqtab_vec
       { };
 
       /* Total frequency, for each character. */
@@ -365,16 +371,16 @@ namespace sux {
       }
 
       /* Radix-sorting threads. */
-      auto sort_fut_vec = portions.parallel_apply_generate_args
-          (from,to,base::bucket_sort<It,Extractor,TrigramType>,
+      auto sort_fut_vec = portions.apply_dynargs
+          (from,to,base::bucket_sort<It,Extractor,elem_type>,
            arg_generator(
-               [&cumul_frqtab_vec,&dest_vec,&extractor](int thread)
+               [&cumul_frqtab_vec,dest,&extractor](int thread)
            {
               return make_tuple(extractor,ref(cumul_frqtab_vec[thread]),dest);
            })
           );
 
-      wait_for_results(sort_fut_vec);
+      wait_for(sort_fut_vec);
     }
 
     template <typename TrigramType>
@@ -386,13 +392,13 @@ namespace sux {
       /* Vector for intermediate results. */
       std::vector<TrigramType> temp_vec(trigrams.size());
       /* First pass. */
-      parallel_bucket_sort(begin(trigrams),end(trigrams),temp_vec,triget3<TrigramType>,portions);
+      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),triget3<TrigramType>,portions);
       swap(trigrams,temp_vec);
       /* Second pass. */
-      parallel_bucket_sort(begin(trigrams),end(trigrams),temp_vec,triget2<TrigramType>,portions);
+      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),triget2<TrigramType>,portions);
       swap(trigrams,temp_vec);
       /* Third pass. */
-      parallel_bucket_sort(begin(trigrams),end(trigrams),temp_vec,triget1<TrigramType>,portions);
+      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),triget1<TrigramType>,portions);
       swap(trigrams,temp_vec);
     }
   };
@@ -454,16 +460,16 @@ namespace sux {
       using std::make_tuple;
       using std::accumulate;
       using std::distance;
-      using rlxutil::parallel_vector;
       using trigram_tools::content_equal;
-      using rlxutil::parvec;
 
       using rlxutil::deref;
       using rlxutil::is_compatible;
+      using rlxutil::parallel::tools::wait_for;
 
       typedef typename deref<It>::type      elem_type;
       typedef typename elem_type::pos_type  pos_type;
       typedef typename deref<DestIt>::type  dest_type;
+      typedef rlxutil::parallel::portions::adjustment adjustment;
 
       /* Verify that the destination vector has the right element
        * type. */
@@ -483,15 +489,16 @@ namespace sux {
        * not cause incorrect lexical renaming (the trigram
        * at the beginning of a thread must not be identical
        * to the trigram at the end of the previous thread.) */
-      portions.boundary_adjustment(
+      portions.assign(
+          start,end,portions.num(),
           [](It /*beg*/,It it,It end)
           {
             if (it != end) {
                 It nx = next(it);
                 if ((nx != end) && content_equal(*it,*nx))
-                  return vec_type::adjustment::needed;
+                  return adjustment::needed;
             }
-            return vec_type::adjustment::unneeded;
+            return adjustment::unneeded;
           });
 
       /* Fill the new vector with the new lexical names. Each thread
@@ -499,8 +506,8 @@ namespace sux {
        * by each thread provides the total number of unique names
        * created by that thread. */
       auto dest_futs =
-          portions.apply(
-              [](It from, It to, It beg, dest_It dest_start)
+          portions.apply(start,end,
+              [](It from, It to, It beg, DestIt dest_it)
               {
                 using trigram_tools::content_equal;
 
@@ -510,16 +517,16 @@ namespace sux {
                 if (from == to)
                   return current_name;
 
-                dest += distance(beg,from);
-                *dest = current_name;
-                ++dest;
+                dest_it += distance(beg,from);
+                *dest_it = current_name;
+                ++dest_it;
                 It next = std::next(from);
                 while (from != to)
                   {
                     if (!content_equal(*from,*next))
                       ++current_name;
-                    *dest = current_name;
-                    ++dest;
+                    *dest_it = current_name;
+                    ++dest_it;
                     from = next;
                     next = std::next(from);
                   }
@@ -528,7 +535,7 @@ namespace sux {
                  * number of unique names. */
                 return current_name;
               },
-              trigrams.begin(),dest_start
+              start,dest_start
           );
 
       /* Wait for the threads to finish and add up all the totals. */
@@ -544,7 +551,7 @@ namespace sux {
       rlxutil::parallel::portions dest_portions
       { dest_start, dest_end, portions.num() };
       auto correction_futs =
-          dest_portions.apply_dynargs(
+          dest_portions.apply_dynargs(dest_start,dest_end,
               [](DestIt from, DestIt to, bool skip, size_t start)
               {
                 if (skip)
@@ -555,13 +562,13 @@ namespace sux {
               [&dest_futs](size_t thread)
               {
                 if (thread == 0)
-                  return make_tuple(true,(size_t)0);
+                  return make_tuple(true,(pos_type)0);
                 return make_tuple(false,dest_futs[thread-1].get());
               }
           );
 
       /* Wait for threads to finish. */
-      wait_for_results(correction_futs);
+      wait_for(correction_futs);
 
       /* Return a pair { bool , vec } where bool is true if all new
        * lexicographical names were unique, and vec is the vector with
@@ -579,12 +586,13 @@ namespace sux {
     template <typename InputVector>
     struct std_dest_element
     {
-      typedef rlxutil::deref<decltype(declval<InputVector>().begin())>::type elem_type;
+      typedef typename rlxutil::deref<decltype(std::declval<InputVector>().begin())>::type elem_type;
       typedef typename elem_type::pos_type type;
     };
 
-    template <typename InputVector>
-    using result_type = std::pair<recursion,typename std_dest_element<Vector>::type>;
+    template <typename InpVector>
+    using result_type =
+        std::pair<recursion,std::vector<typename std_dest_element<InpVector>::type>>;
 
     /**
      * The `apply()` function returns a result that includes information
@@ -652,25 +660,32 @@ namespace sux {
      *       // perform recursion...
      *
      */
-    template <typename Vector> static
-    result_type<Vector> apply(Vector &trigrams, rlxutil::parallel::portions &portions)
+    template <typename InpVector> static
+    result_type<InpVector> apply(InpVector &trigrams, rlxutil::parallel::portions &portions)
     {
-      typedef typename std_dest_element<Vector>::type pos_type;
+      typedef typename std_dest_element<InpVector>::type pos_type;
       std::vector<pos_type> dest_vec(trigrams.size());
-      lexicographical_renaming::recursion flag =
-          lexicographical_renaming<Vector>::apply(
-              trigrams.begin(),trigrams.end(),portions,dest_vec.begin(),dest_vec.end());
+      lexicographical_renaming::recursion flag = apply(
+          trigrams.begin(),trigrams.end(),portions,dest_vec.begin(),dest_vec.end());
       return { flag , std::move(dest_vec) };
     }
 
-    template <typename Vector> static
-    typename lexicographical_renaming<Vector>::result_type
-    rename_lexicographically(Vector &trigrams)
-    {
-      return lexicographical_renaming<Vector>::apply(trigrams);
-    }
-
   };
+
+  template <typename InpVector> lexicographical_renaming::result_type<InpVector>
+  rename_lexicographically(
+      InpVector &trigrams, rlxutil::parallel::portions &portions)
+  {
+    return lexicographical_renaming::apply(trigrams,portions);
+  }
+
+  template <typename InpVector> lexicographical_renaming::result_type<InpVector>
+  rename_lexicographically(InpVector &trigrams)
+  {
+    rlxutil::parallel::portions portions
+    { trigrams.begin(), trigrams.end(), 4 };
+    return lexicographical_renaming::apply(trigrams,portions);
+  }
 
 }
 

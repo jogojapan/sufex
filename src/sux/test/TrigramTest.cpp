@@ -250,7 +250,7 @@ void perform_multi_threaded_trigram_sorting()
 //}
 
 template <sux::TGImpl tgimpl>
-rlxutil::parallel_vector<typename sux::TrigramMaker<tgimpl,char,Pos>::trigram_type,1>
+std::vector<typename sux::TrigramMaker<tgimpl,char,Pos>::trigram_type>
 make_boundary_adjustment_testinput()
 {
   typedef typename sux::TrigramMaker<tgimpl,char,Pos>::trigram_type elem_type;
@@ -264,7 +264,7 @@ make_boundary_adjustment_testinput()
 }
 
 template <>
-rlxutil::parallel_vector<typename sux::TrigramMaker<sux::TGImpl::pointer,char,Pos>::trigram_type,1>
+std::vector<typename sux::TrigramMaker<sux::TGImpl::pointer,char,Pos>::trigram_type>
 make_boundary_adjustment_testinput<sux::TGImpl::pointer>()
 {
   typedef typename sux::TrigramMaker<sux::TGImpl::pointer,char,Pos>::trigram_type elem_type;
@@ -284,19 +284,23 @@ void perform_boundary_adjustment_test()
   using sux::TGImpl;
   using sux::trigram_tools::content_equal;
 
-  typedef TrigramMaker<tgimpl,char,Pos> maker;
-  typedef typename maker::trigram_type  elem_type;
-  typedef std::vector<elem_type>        vec_type;
-  typedef typename vec_type::const_iterator It;
+  typedef TrigramMaker<tgimpl,char,Pos>           maker;
+  typedef typename maker::trigram_type            elem_type;
+  typedef std::vector<elem_type>                  vec_type;
+  typedef typename vec_type::const_iterator       It;
+  typedef rlxutil::parallel::portions::adjustment adjustment;
 
   vec_type vec
   { make_boundary_adjustment_testinput<tgimpl>() };
 
   rlxutil::parallel::portions portions
-  { begin(vec),end(vec),1,5 };
+  { begin(vec) , end(vec) , 5 , 1 };
+
   auto actual = portions.get_boundaries();
+
   typename vec_type::const_iterator beg
   { vec.begin() };
+
   decltype(actual) expected
   {
     { 0 , 1 },
@@ -305,18 +309,19 @@ void perform_boundary_adjustment_test()
     { 3 , 4 },
     { 4 , 5 }
   };
+
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 
-  portions.thread_boundary_adjustment(
+  portions.assign(begin(vec),end(vec),5,
       [](It /*beg*/,It it,It end)
       {
         if (it != end) {
           It nx = next(it);
           if ((nx != end) && content_equal(*it,*nx))
-            return vec_type::adjustment::needed;
+            return adjustment::needed;
         }
-        return vec_type::adjustment::unneeded;
+        return adjustment::unneeded;
       });
 
   actual   = portions.get_boundaries();
@@ -380,8 +385,11 @@ BOOST_AUTO_TEST_CASE(sux_builder_lexicographical_renaming)
   std::vector<Pos> expected
   { 0,1,2,2,2,2,3,4,4,4,5,5,5,5,5,6,6,7,8,9,10,11,12,13,14,15 };
 
-  typedef sux::lexicographical_renaming<decltype(input)> lex;
+  typedef sux::lexicographical_renaming lex;
 
-  auto renamed_vec = sux::rename_lexicographically(input);
-  BOOST_CHECK(equal(begin(expected),end(expected),begin(lex::newstring_of(renamed_vec))));
+  auto results = sux::rename_lexicographically(input);
+  std::vector<Pos> renamed_vec
+  { lex::move_newstring_from(results) };
+
+  BOOST_CHECK(equal(begin(expected),end(expected),begin(renamed_vec)));
 }
