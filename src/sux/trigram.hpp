@@ -27,6 +27,7 @@
 
 #include "alphabet.hpp"
 #include "../util/parallelization.hpp"
+#include "../util/more_algorithm.hpp"
 
 namespace sux {
 
@@ -540,6 +541,7 @@ namespace sux {
 
                 /* Return the current name, i.e. the total
                  * number of unique names. */
+                ++current_name;
                 return current_name;
               },
               start,dest_start
@@ -548,41 +550,29 @@ namespace sux {
       /* Wait for the threads to finish and add up all the totals. */
       std::vector<pos_type> total_vec(dest_futs.size());
       std::transform(dest_futs.begin(),dest_futs.end(),total_vec.begin(),
-          [](future<pos_type> &fut)
-          {
-        return fut.get();
-          });
-//      pos_type total_names =
-//          accumulate(total_vec.begin(),total_vec.end(),(pos_type)0,
-//              [](pos_type total, future<pos_type> &fut)
-//              { return total + fut.get(); }
-//          );
-      pos_type total_names =
-          accumulate(total_vec.begin(),total_vec.end(),(pos_type)0);
+          [](future<pos_type> &fut){ return fut.get(); }
+      );
+      pos_type total_names
+      { rlxutil::algorithm::make_cumulative(total_vec.begin(),total_vec.end()) };
 
       /* From the second thread on, all threads require post-correction
        * since the names they created start at 0 but need to start at
        * wherever the previous thread ended. */
       auto correction_futs =
           portions.apply_dynargs(dest_start,dest_end,
-              [](DestIt from, DestIt to, bool skip, size_t start)
+              [](DestIt from, DestIt to, bool skip, size_t initial)
               {
-                std::cerr << "Called with skip == " << std::boolalpha << skip << std::endl;
                 if (!skip)
                   while (from != to) {
-                      *from += start;
+                      *from += initial;
                       ++from;
                   }
               },
               arg_generator([&total_vec](size_t thread)
               {
-                std::cerr << "Making args for thread " << thread << std::endl;
                 if (thread == 0)
                   return make_tuple(true,(pos_type)0);
-                else {
-                    std::cerr << "Starting value " << total_vec[thread-1] << std::endl;
-                    return make_tuple(false,(pos_type)(total_vec[thread-1]+thread));
-                }
+                return make_tuple(false,total_vec[thread-1]);
               })
           );
 

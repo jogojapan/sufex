@@ -110,6 +110,21 @@ namespace rlxutil {
       enum class adjustment : bool
       { unneeded , needed };
 
+      template <typename Fun, typename Arg>
+      struct is_boundary_adjuster
+      {
+        static constexpr bool value =
+            std::is_same<typename std::result_of<Fun(Arg,Arg,Arg)>::type,adjustment>::value;
+      };
+
+      template <typename Arg>
+      struct is_boundary_adjuster<std::nullptr_t,Arg>
+      { static constexpr bool value = true; };
+
+      template <typename Arg>
+      struct is_boundary_adjuster<int,Arg>
+      { static constexpr bool value = false; };
+
       portions(unsigned min_portion_size = 10000) :
         _min_portion_size(static_cast<diff_t>(min_portion_size)),
         _offsets(),
@@ -125,13 +140,15 @@ namespace rlxutil {
 
       // This might cause conflicts with the previous non-template
       // declaration.
-//      template <typename It, typename BoundAdjust>
-//      portions(It start, It end, diff_t num_portions,
-//          BoundAdjust &&boundary_adjuster, diff_t min_portion_size = 10000) :
-//        _min_portion_size(min_portion_size),
-//        _offsets(),
-//        _total_range(std::distance(start,end))
-//      { assign(start,end,num_portions,std::forward<BoundAdjust>(boundary_adjuster)); }
+      template <typename It, typename BoundAdjust>
+      portions(It start, It end, diff_t num_portions,
+          BoundAdjust &&boundary_adjuster,
+          diff_t min_portion_size = 10000,
+          typename std::enable_if<is_boundary_adjuster<BoundAdjust,It>::value,unsigned>::type dummy = 0) :
+        _min_portion_size(min_portion_size),
+        _offsets(),
+        _total_range(std::distance(start,end))
+      { assign(start,end,num_portions,std::forward<BoundAdjust>(boundary_adjuster)); }
 
       /**
        * Calculate the start and end offsets for `num` portions of a range of
@@ -323,17 +340,6 @@ namespace rlxutil {
       /** The total number of items covered by the portions. */
       diff_t                                 _total_range;
 
-      template <typename Fun, typename Arg>
-      struct is_boundary_adjuster
-      {
-        static constexpr bool value =
-            std::is_same<typename std::result_of<Fun(Arg,Arg,Arg)>::type,adjustment>::value;
-      };
-
-      template <typename Arg>
-      struct is_boundary_adjuster<std::nullptr_t,Arg>
-      { static constexpr bool value = true; };
-
       /**
        * Calculate portion boundaries and re-adjust them with the user-defined
        * adjustment function.
@@ -436,9 +442,7 @@ namespace rlxutil {
        * There shouldn't usually be a need for ordinary users to
        * call this function.
        */
-//      auto get_boundaries() const -> const decltype(this->_offsets) &
-//      { return _offsets; }
-      const std::vector<std::pair<diff_t,diff_t>> &get_boundaries() const
+      auto get_boundaries() const -> const decltype(_offsets) &
       { return _offsets; }
     };
 
