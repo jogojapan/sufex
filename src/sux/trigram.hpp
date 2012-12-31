@@ -22,6 +22,9 @@
 #include <thread>
 #include <chrono>
 
+#include <iostream>
+#include <ios>
+
 #include "alphabet.hpp"
 #include "../util/parallelization.hpp"
 
@@ -125,6 +128,9 @@ namespace sux {
     char_type get1() const { return *_p; }
     char_type get2() const { return *(_p+1); }
     char_type get3() const { return *(_p+2); }
+
+    bool operator==(const TrigramImpl &other)
+    { return content_equal(other); }
 
     bool content_equal(const TrigramImpl &other) const
     { return ((get1() == other.get1()) && (get2() == other.get2() && (get3() == other.get3()))); }
@@ -465,6 +471,7 @@ namespace sux {
       using rlxutil::deref;
       using rlxutil::is_compatible;
       using rlxutil::parallel::tools::wait_for;
+      using rlxutil::parallel::tools::arg_generator;
 
       typedef typename deref<It>::type      elem_type;
       typedef typename elem_type::pos_type  pos_type;
@@ -521,7 +528,7 @@ namespace sux {
                 *dest_it = current_name;
                 ++dest_it;
                 It next = std::next(from);
-                while (from != to)
+                while (next != to)
                   {
                     if (!content_equal(*from,*next))
                       ++current_name;
@@ -539,32 +546,44 @@ namespace sux {
           );
 
       /* Wait for the threads to finish and add up all the totals. */
+      std::vector<pos_type> total_vec(dest_futs.size());
+      std::transform(dest_futs.begin(),dest_futs.end(),total_vec.begin(),
+          [](future<pos_type> &fut)
+          {
+        return fut.get();
+          });
+//      pos_type total_names =
+//          accumulate(total_vec.begin(),total_vec.end(),(pos_type)0,
+//              [](pos_type total, future<pos_type> &fut)
+//              { return total + fut.get(); }
+//          );
       pos_type total_names =
-          accumulate(dest_futs.begin(),dest_futs.end(),(pos_type)0,
-              [](pos_type total, future<pos_type> &fut)
-              { return total + fut.get(); }
-          );
+          accumulate(total_vec.begin(),total_vec.end(),(pos_type)0);
 
       /* From the second thread on, all threads require post-correction
        * since the names they created start at 0 but need to start at
        * wherever the previous thread ended. */
-      rlxutil::parallel::portions dest_portions
-      { dest_start, dest_end, portions.num() };
       auto correction_futs =
-          dest_portions.apply_dynargs(dest_start,dest_end,
+          portions.apply_dynargs(dest_start,dest_end,
               [](DestIt from, DestIt to, bool skip, size_t start)
               {
-                if (skip)
-                  return;
-                while (from != to)
-                  *from += start;
+                std::cerr << "Called with skip == " << std::boolalpha << skip << std::endl;
+                if (!skip)
+                  while (from != to) {
+                      *from += start;
+                      ++from;
+                  }
               },
-              [&dest_futs](size_t thread)
+              arg_generator([&total_vec](size_t thread)
               {
+                std::cerr << "Making args for thread " << thread << std::endl;
                 if (thread == 0)
                   return make_tuple(true,(pos_type)0);
-                return make_tuple(false,dest_futs[thread-1].get());
-              }
+                else {
+                    std::cerr << "Starting value " << total_vec[thread-1] << std::endl;
+                    return make_tuple(false,(pos_type)(total_vec[thread-1]+thread));
+                }
+              })
           );
 
       /* Wait for threads to finish. */

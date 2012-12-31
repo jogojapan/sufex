@@ -9,6 +9,7 @@
 #define PARALLELIZATION_HPP_
 
 #include <cstddef>
+#include <cassert>
 #include <vector>
 #include <utility>
 #include <functional>
@@ -109,15 +110,15 @@ namespace rlxutil {
       enum class adjustment : bool
       { unneeded , needed };
 
-      portions(diff_t min_portion_size = 10000) :
-        _min_portion_size(min_portion_size),
+      portions(unsigned min_portion_size = 10000) :
+        _min_portion_size(static_cast<diff_t>(min_portion_size)),
         _offsets(),
         _total_range()
       { }
 
       template <typename It>
-      portions(It start, It end, unsigned num_portions, diff_t min_portion_size = 10000) :
-        _min_portion_size(min_portion_size),
+      portions(It start, It end, std::size_t num_portions, diff_t min_portion_size = 10000) :
+        _min_portion_size(static_cast<diff_t>(min_portion_size)),
         _offsets(),
         _total_range(std::distance(start,end))
       { assign(start,end,num_portions); }
@@ -146,7 +147,7 @@ namespace rlxutil {
        *     or `adjustment::unneeded`.
        */
       template <typename It, typename BoundAdjust = std::nullptr_t>
-      void assign(It range_from, It range_to, const unsigned num_threads,
+      void assign(It range_from, It range_to, const std::size_t num_threads,
           BoundAdjust &&boundary_adjuster = nullptr)
       {
         using std::forward;
@@ -184,7 +185,7 @@ namespace rlxutil {
             [](diff_t t, const pair<diff_t,diff_t> &p) { return t + (p.second - p.first); });
 
         /* Paranoia. */
-        assert(distance(range_from.range_to) == _total_range);
+        assert(distance(range_from,range_to) == _total_range);
       }
 
       /**
@@ -192,6 +193,13 @@ namespace rlxutil {
        */
       std::size_t num() const
       { return _offsets.size(); }
+
+      /**
+       * Return the minimum number of entries per portion configured for
+       * this portions object.
+       */
+      std::size_t min_portion_size() const
+      { return static_cast<std::size_t>(_min_portion_size); }
 
       /**
        * Apply a function to all elements of the vector, running multiple

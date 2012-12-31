@@ -16,7 +16,8 @@ configure_file (
 
 # Removed -Wshadow from the below to avoid a deluge of warnings from
 # Boost.
-ADD_DEFINITIONS(-std=c++11 -g -DNDEBUG -O3 -pthread -Wall -W -Wpointer-arith -Wcast-qual -Wcast-align -D_GLIBCXX_USE_NANOSLEEP)
+# Disable debug mode: -DNDEBUG
+ADD_DEFINITIONS(-std=c++11 -g -O3 -pthread -Wall -W -Wpointer-arith -Wcast-qual -Wcast-align -D_GLIBCXX_USE_NANOSLEEP)
 
 include_directories("${PROJECT_BINARY_DIR}")
 
@@ -72,3 +73,6 @@ add_test (TrigramTest ${test_bin_dir}/TrigramTest)
 
 add_executable (${test_bin_dir}/TupletoolsTest util/test/TupletoolsTest.cpp)
 add_test (TupletoolsTest ${test_bin_dir}/TupletoolsTest)
+
+add_executable (${test_bin_dir}/testapp sux/test/testapp.cpp)
+target_link_libraries (${test_bin_dir}/testapp ${Boost_LIBRARIES} ${GLOG_LIBRARY})

@@ -1,5 +1,3 @@
-//#include "./S2SParser.hpp"
-
 #define BOOST_TEST_DYN_LINK
 #define BOOST_TEST_MODULE TrigramTest
 #include <boost/test/included/unit_test.hpp>
@@ -201,7 +199,8 @@ void perform_multi_threaded_trigram_sorting()
 
   auto actual = TrigramMaker::make_23trigrams(begin(input),end(input));
   /* Make a copy of the trigrams, which will later be sorted them separately. */
-  auto expected = actual;
+  std::vector<Trigram> expected
+  { actual };
 
   /* Trigam sort. */
   auto tp1 = rlxutil::combined_clock<std::micro>::now();
@@ -390,6 +389,12 @@ BOOST_AUTO_TEST_CASE(sux_builder_lexicographical_renaming)
   auto results = sux::rename_lexicographically(input);
   std::vector<Pos> renamed_vec
   { lex::move_newstring_from(results) };
+
+  for (const auto &elem : renamed_vec)
+    {
+      cout << elem << ',';
+    }
+  cout << endl;
 
   BOOST_CHECK(equal(begin(expected),end(expected),begin(renamed_vec)));
 }
