@@ -204,6 +204,15 @@ namespace sux {
     template <typename It, TGImpl tgimpl, typename Char, typename Pos>
     Pos pos_of(It it, const TrigramImpl<tgimpl,Char,Pos> &trigram)
     { return posmapper<tgimpl,Char,Pos>::pos_of(it,trigram); }
+
+    template <TGImpl tgimpl, typename Char, typename Pos>
+    std::basic_string<Char> to_str(const TrigramImpl<tgimpl,Char,Pos> &trigram)
+    {
+      std::basic_string<Char> result
+      { triget1(trigram) , triget2(trigram) , triget3(trigram) };
+      return result;
+    }
+
   }
 
   /**

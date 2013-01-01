@@ -49,8 +49,8 @@ namespace rlxalgo {
         DestIt                       dest_start,
         DestIt                       dest_end,
         bool                         (&eq)      (const deref<It> &, const deref<It> &),
-        typename std::enable_if<is_posmap<Posmap>::value,Posmap>::type &&posmap =
-            std_posmap<typename deref<It>::pos_type>)
+        Posmap                      &&posmap = std_posmap<typename deref<It>::pos_type>,
+        typename std::enable_if<is_posmap<Posmap>::value,int>::type = 0)
     {
       using std::move;
       using std::size_t;
@@ -260,8 +260,8 @@ namespace rlxalgo {
         InpVector                   &trigrams,
         rlxutil::parallel::portions &portions,
         bool                        (&eq)(const elem_type<InpVector>&, const elem_type<InpVector> &),
-        typename std::enable_if<is_posmap<Posmap>::value,Posmap>::type &&posmap =
-            std_posmap<typename elem_type<InpVector>::pos_type>)
+        Posmap                      &&posmap = std_posmap<typename elem_type<InpVector>::pos_type>,
+        typename std::enable_if<is_posmap<Posmap>::value,int>::type = 0)
     {
       using std::forward;
       typedef typename std_dest_element<InpVector>::type pos_type;
@@ -282,23 +282,24 @@ namespace rlxalgo {
       InpVector                   &trigrams,
       rlxutil::parallel::portions &portions,
       bool                        (&eq)(const elem_type<InpVector> &, const elem_type<InpVector> &),
-      typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,Posmap>::type &&posmap =
-          lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)
+      Posmap                      &&posmap =
+          lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>,
+      typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,int>::type = 0)
   {
     using std::forward;
     return lexicographical_renaming::apply(trigrams,portions,eq,forward<Posmap>(posmap));
   }
 
-  template
-    <typename InpVector,
-     typename Posmap =
-         decltype(lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)>
+  template <typename InpVector,
+            typename Posmap =
+                decltype(lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)>
   lexicographical_renaming::result_type<InpVector> rename_lexicographically(
       InpVector   &trigrams,
       bool        (&eq)       (const elem_type<InpVector> &, const elem_type<InpVector> &),
       unsigned    threads = 4,
-      typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,Posmap>::type &&posmap =
-          lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)
+      Posmap      &&posmap =
+          lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>,
+      typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,int>::type = 0)
   {
     using std::forward;
 
