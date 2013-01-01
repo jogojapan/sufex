@@ -410,6 +410,9 @@ namespace sux {
     }
   };
 
+  /**
+   * Extract the 2,3-trigrams from a `std::basic_string`.
+   */
   template <TGImpl tgimpl = TGImpl::tuple, typename Char = char>
   typename TrigramMaker<tgimpl,Char,typename std::basic_string<Char>::size_type>::trigram_vec_type
   string_to_23trigrams(
@@ -419,20 +422,18 @@ namespace sux {
         begin(str),end(str));
   }
 
-/* This version of sort_23trigrams is commented out as it causes
- * an internal compiler error with GCC. */
-//  template <AlphabetClass alphaclass, typename... Args>
-//  void sort_23trigrams(
-//      rlxutil::parallel_vector<Args...> &trigrams)
-//  {
-//    typedef rlxutil::parallel_vector<Args...> vec_type;
-//    typedef typename vec_type::value_type     trigram_type;
-//    typedef typename trigram_type::char_type  char_type;
-//    typedef typename trigram_type::pos_type   pos_type;
-//
-//    TrigramSorter<char_type,pos_type>::template AlphabetSpecific<alphaclass>::sort_23trigrams(trigrams);
-//  }
-
+  /**
+   * Assuming that the first argument is a random-access container
+   * containing the 2,3-trigrams of a string, this sorts them
+   * lexicographically, using three passes of multi-threaded
+   * radix-sort.
+   *
+   * Note that we did not provide a (from,to)-style iterator-
+   * based interface for this, because internally, the sorting
+   * procedure will create another container of the same size
+   * and same type as the given one. This wouldn't be possible if
+   * only iterators were available.
+   */
   template <AlphabetClass alphaclass, typename Vector>
   void sort_23trigrams(Vector &trigrams, unsigned num_threads)
   {

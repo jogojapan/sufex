@@ -121,6 +121,22 @@ namespace rlxutil {
       struct is_boundary_adjuster<std::nullptr_t,Arg>
       { static constexpr bool value = true; };
 
+      /**
+       * The following specialization is used by all types convertible to
+       * `int`. Should there be an integral type for which it doesn't work,
+       * there will be problems with the `portions(It,It,diff_t,BoundAdjust,diff_t)`
+       * constructor, because if a user intends to use the `portions(It,It,size_t,diff_t)`
+       * constructor, leaving the last argument empty (i.e. using the default), the
+       * compiler will try both constructors, thus evaluating the primary
+       * template for `is_boundary_adjuster`, which involves evaluating the
+       * `std::result_of` expression it contains. That will cause a compilation
+       * error when applied to an integral type.
+       *
+       * So if you want to use, as third argument (`size_t num_portions) to the
+       * `portions` constructor, an integral type that doesn't match the
+       * specialization below, you must define a new specialization (also
+       * setting `value` to false) for that type.
+       */
       template <typename Arg>
       struct is_boundary_adjuster<int,Arg>
       { static constexpr bool value = false; };
@@ -138,8 +154,6 @@ namespace rlxutil {
         _total_range(std::distance(start,end))
       { assign(start,end,num_portions); }
 
-      // This might cause conflicts with the previous non-template
-      // declaration.
       template <typename It, typename BoundAdjust>
       portions(It start, It end, diff_t num_portions,
           BoundAdjust &&boundary_adjuster,
