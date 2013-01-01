@@ -32,9 +32,9 @@ namespace rlxutil {
   { typedef typename std::remove_reference<decltype(*(std::declval<T>()))>::type type; };
 
   /**
-   * Use this to compute, at compile time, the type of the result of
-   * dereferencing an expression of type `T`. This works with pointers,
-   * iterators and anything that has a unary `operator*`.
+   * Use this to compute, at compile time, the element type of the given
+   * container type T. This assumes that T implements a function begin(),
+   * which returns an iterator.
    */
   template <typename T>
   struct elemtype

@@ -73,10 +73,10 @@ add_test (TrigramTest ${test_bin_dir}/trigram_test)
 
 add_executable (${test_bin_dir}/lexicographical_renaming_test sux/test/lexicographical_renaming_test.cpp)
 target_link_libraries (${test_bin_dir}/lexicographical_renaming_test ${Boost_LIBRARIES} ${GLOG_LIBRARY})
-add_test (TrigramTest ${test_bin_dir}/lexicographical_renaming_test)
+add_test (trigram_test ${test_bin_dir}/lexicographical_renaming_test)
 
-add_executable (${test_bin_dir}/TupletoolsTest util/test/TupletoolsTest.cpp)
-add_test (TupletoolsTest ${test_bin_dir}/TupletoolsTest)
+add_executable (${test_bin_dir}/tupletools_test util/test/tupletools_test.cpp)
+add_test (tupletools_test ${test_bin_dir}/tupletools_test)
 
 #add_executable (${test_bin_dir}/testapp sux/test/testapp.cpp)
 #target_link_libraries (${test_bin_dir}/testapp ${Boost_LIBRARIES} ${GLOG_LIBRARY})
