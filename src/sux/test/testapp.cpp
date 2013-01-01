@@ -57,7 +57,7 @@ int main()
   std::vector<Pos> expected
   { 0,1,2,2,2,2,3,4,4,4,5,5,5,5,5,6,6,7,8,9,10,11,12,13,14,15 };
 
-  typedef sux::lexicographical_renaming lex;
+  typedef sux::lexicographical_renaming<> lex;
 
   auto results = sux::rename_lexicographically(input);
   std::vector<Pos> renamed_vec

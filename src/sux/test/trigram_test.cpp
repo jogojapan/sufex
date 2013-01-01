@@ -233,20 +233,20 @@ void perform_multi_threaded_trigram_sorting()
   BOOST_CHECK(equal(begin(actual),end(actual),begin(expected)));
 }
 
-//BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_tuple)
-//{
-//  perform_multi_threaded_trigram_sorting<sux::TGImpl::tuple>();
-//}
-//
-//BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_arraytuple)
-//{
-//  perform_multi_threaded_trigram_sorting<sux::TGImpl::arraytuple>();
-//}
-//
-//BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_pointer)
-//{
-//  perform_multi_threaded_trigram_sorting<sux::TGImpl::pointer>();
-//}
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_tuple)
+{
+  perform_multi_threaded_trigram_sorting<sux::TGImpl::tuple>();
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_arraytuple)
+{
+  perform_multi_threaded_trigram_sorting<sux::TGImpl::arraytuple>();
+}
+
+BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test_pointer)
+{
+  perform_multi_threaded_trigram_sorting<sux::TGImpl::pointer>();
+}
 
 template <sux::TGImpl tgimpl>
 std::vector<typename sux::TrigramMaker<tgimpl,char,Pos>::trigram_type>
@@ -340,61 +340,4 @@ BOOST_AUTO_TEST_CASE(sux_builder_boundary_adjustment)
   perform_boundary_adjustment_test<sux::TGImpl::tuple>();
   perform_boundary_adjustment_test<sux::TGImpl::arraytuple>();
   perform_boundary_adjustment_test<sux::TGImpl::pointer>();
-}
-
-BOOST_AUTO_TEST_CASE(sux_builder_lexicographical_renaming)
-{
-  /* Lexicographical renaming is tested only for one particular
-   * implemenatation of trigrams, `TGImpl::pointer`, because
-   * tests for this are the easiest to code. Aspects of the
-   * other implementations that would affect lexicographical
-   * renaming are assumed to be covered by other tests. */
-
-  typedef sux::TrigramMaker<sux::TGImpl::pointer,char,Pos>   maker;
-  typedef typename maker::trigram_type                       elem_type;
-  std::vector<elem_type> input {
-    elem_type { "aec" },
-    elem_type { "aef" },
-    elem_type { "bhj" },
-    elem_type { "bhj" },
-    elem_type { "bhj" },
-    elem_type { "bhj" },
-    elem_type { "dkh" },
-    elem_type { "dnr" },
-    elem_type { "dnr" },
-    elem_type { "dnr" },
-    elem_type { "eca" },
-    elem_type { "eca" },
-    elem_type { "eca" },
-    elem_type { "eca" },
-    elem_type { "eca" },
-    elem_type { "kuw" },
-    elem_type { "kuw" },
-    elem_type { "lpp" },
-    elem_type { "lpy" },
-    elem_type { "qqq" },
-    elem_type { "qxz" },
-    elem_type { "rst" },
-    elem_type { "rsu" },
-    elem_type { "rua" },
-    elem_type { "rub" },
-    elem_type { "ruc" }
-  };
-
-  std::vector<Pos> expected
-  { 0,1,2,2,2,2,3,4,4,4,5,5,5,5,5,6,6,7,8,9,10,11,12,13,14,15 };
-
-  typedef sux::lexicographical_renaming lex;
-
-  auto results = sux::rename_lexicographically(input);
-  std::vector<Pos> renamed_vec
-  { lex::move_newstring_from(results) };
-
-  for (const auto &elem : renamed_vec)
-    {
-      cout << elem << ',';
-    }
-  cout << endl;
-
-  BOOST_CHECK(equal(begin(expected),end(expected),begin(renamed_vec)));
 }

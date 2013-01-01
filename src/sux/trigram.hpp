@@ -16,14 +16,11 @@
 #include <iterator>
 #include <map>
 #include <future>
-
+#include <cstddef>
 #include <iostream>
 #include <ios>
 #include <thread>
 #include <chrono>
-
-#include <iostream>
-#include <ios>
 
 #include "alphabet.hpp"
 #include "../util/parallelization.hpp"
@@ -69,9 +66,10 @@ namespace sux {
     :base_type(pos,c1,c2,c3)
     {}
 
-    Char get1() const { return std::get<1>(*this); }
-    Char get2() const { return std::get<2>(*this); }
-    Char get3() const { return std::get<3>(*this); }
+    pos_type  pos() const  { return std::get<0>(*this); }
+    char_type get1() const { return std::get<1>(*this); }
+    char_type get2() const { return std::get<2>(*this); }
+    char_type get3() const { return std::get<3>(*this); }
 
     bool content_equal(const TrigramImpl &other) const
     { return ((get1() == other.get1()) && (get2() == other.get2() && (get3() == other.get3()))); }
@@ -97,6 +95,7 @@ namespace sux {
     :base_type(pos,{{c1,c2,c3}})
     {}
 
+    pos_type  pos() const  { return std::get<0>(*this); }
     char_type get1() const { return std::get<1>(*this)[0]; }
     char_type get2() const { return std::get<1>(*this)[1]; }
     char_type get3() const { return std::get<1>(*this)[2]; }
@@ -156,6 +155,55 @@ namespace sux {
     const char *impl_of(const TrigramImpl<tgimpl,Char,Pos> &)
     { return repr<tgimpl>::str; }
 
+    template <TGImpl tgimpl, typename Char, typename Pos>
+    struct posmapper;
+
+    template <typename Char, typename Pos>
+    struct posmapper<TGImpl::tuple,Char,Pos>
+    {
+      static Pos pos_of(const TrigramImpl<TGImpl::tuple,Char,Pos> &trigram)
+      { return trigram.pos(); }
+
+      template <typename It>
+      static Pos pos_of(It, const TrigramImpl<TGImpl::tuple,Char,Pos> &trigram)
+      { return trigram.pos(); }
+    };
+
+    template <typename Char, typename Pos>
+    struct posmapper<TGImpl::arraytuple,Char,Pos>
+    {
+      static Pos pos_of(const TrigramImpl<TGImpl::arraytuple,Char,Pos> &trigram)
+      { return trigram.pos(); }
+
+      template <typename It>
+      static Pos pos_of(It, const TrigramImpl<TGImpl::arraytuple,Char,Pos> &trigram)
+      { return trigram.pos(); }
+    };
+
+    template <typename Char, typename Pos>
+    struct posmapper<TGImpl::pointer,Char,Pos>
+    {
+      template <typename It>
+      static Pos pos_of(It start, const TrigramImpl<TGImpl::pointer,Char,Pos> &trigram)
+      { return trigram._p - &*start; }
+    };
+
+    /**
+     * Maps a trigram to the text position it refers to. This does not
+     * work for `TGImpl::pointer` trigrams.
+     */
+    template <TGImpl tgimpl, typename Char, typename Pos>
+    Pos pos_of(const TrigramImpl<tgimpl,Char,Pos> &trigram)
+    { return posmapper<tgimpl,Char,Pos>::pos_of(trigram); }
+
+    /**
+     * Maps a trigram to the text position it refers to. This works
+     * for all trigram types, but requires that the starting point
+     * of the reference text is given as iterator.
+     */
+    template <typename It, TGImpl tgimpl, typename Char, typename Pos>
+    Pos pos_of(It it, const TrigramImpl<tgimpl,Char,Pos> &trigram)
+    { return posmapper<tgimpl,Char,Pos>::pos_of(it,trigram); }
   }
 
   /**
@@ -413,13 +461,25 @@ namespace sux {
   /**
    * Extract the 2,3-trigrams from a `std::basic_string`.
    */
-  template <TGImpl tgimpl = TGImpl::tuple, typename Char = char>
+  template <TGImpl tgimpl = TGImpl::arraytuple, typename Char = char>
   typename TrigramMaker<tgimpl,Char,typename std::basic_string<Char>::size_type>::trigram_vec_type
   string_to_23trigrams(
       const std::basic_string<Char> &str)
   {
     return TrigramMaker<tgimpl,Char,typename std::basic_string<Char>::size_type>::make_23trigrams(
         begin(str),end(str));
+  }
+
+  /**
+   * Extract the 2,3-trigrams from a character sequence represented by two
+   * input iterators.
+   */
+  template <typename Pos, TGImpl tgimpl = TGImpl::arraytuple, typename It>
+  typename TrigramMaker<tgimpl,typename rlxutil::deref<It>::type,Pos>::trigram_vec_type
+  extract_23trigrams(It from, It to)
+  {
+    typedef typename rlxutil::deref<It>::type char_type;
+    return TrigramMaker<tgimpl,char_type,Pos>::make_23trigrams(from,to);
   }
 
   /**
@@ -444,257 +504,6 @@ namespace sux {
 
     TrigramSorter<char_type,pos_type>::template AlphabetSpecific<alphaclass>::sort_23trigrams(
         trigrams,num_threads);
-  }
-
-  struct lexicographical_renaming
-  {
-    enum class recursion : bool { unneeded , needed };
-    /**
-     * Create new lexicographical names in another container.
-     * @return A flag that indicates whether a distinct lexicographical
-     *    name was given to each unique trigram (recusion::unneeded), or
-     *    not (recusion::needed).
-     */
-    template <typename It, typename DestIt>
-    static recursion apply(
-        It start, It end,
-        rlxutil::parallel::portions &portions,
-        DestIt dest_start, DestIt dest_end)
-    {
-      using std::move;
-      using std::size_t;
-      using std::future;
-      using std::make_pair;
-      using std::make_tuple;
-      using std::accumulate;
-      using std::distance;
-      using trigram_tools::content_equal;
-
-      using rlxutil::deref;
-      using rlxutil::is_compatible;
-      using rlxutil::parallel::tools::wait_for;
-      using rlxutil::parallel::tools::arg_generator;
-
-      typedef typename deref<It>::type      elem_type;
-      typedef typename elem_type::pos_type  pos_type;
-      typedef typename deref<DestIt>::type  dest_type;
-      typedef rlxutil::parallel::portions::adjustment adjustment;
-
-      /* Verify that the destination vector has the right element
-       * type. */
-      static_assert(is_compatible<dest_type,pos_type>::value,
-          "Attempt to perform lexicographical renaming where the "
-          "elements of the destination vector do not have the right "
-          "data type to store position information from the source "
-          "vector");
-
-      if (distance(start,end) != distance(dest_start,dest_end))
-        throw std::out_of_range("Attempt to perform lexicographical "
-            "renaming into a destination vector that does not have "
-            "the right size.");
-
-      /* Ensure that threads generated by the parallel vector
-       * implementation start and end at boundaries that do
-       * not cause incorrect lexical renaming (the trigram
-       * at the beginning of a thread must not be identical
-       * to the trigram at the end of the previous thread.) */
-      portions.assign(
-          start,end,portions.num(),
-          [](It /*beg*/,It it,It end)
-          {
-            if (it != end) {
-                It nx = next(it);
-                if ((nx != end) && content_equal(*it,*nx))
-                  return adjustment::needed;
-            }
-            return adjustment::unneeded;
-          });
-
-      /* Fill the new vector with the new lexical names. Each thread
-       * will start from 0 as the first new name. The future returned
-       * by each thread provides the total number of unique names
-       * created by that thread. */
-      auto dest_futs =
-          portions.apply(start,end,
-              [](It from, It to, It beg, DestIt dest_it)
-              {
-                using trigram_tools::content_equal;
-
-                pos_type current_name
-                { 0 };
-
-                if (from == to)
-                  return current_name;
-
-                dest_it += distance(beg,from);
-                *dest_it = current_name;
-                ++dest_it;
-                It next = std::next(from);
-                while (next != to)
-                  {
-                    if (!content_equal(*from,*next))
-                      ++current_name;
-                    *dest_it = current_name;
-                    ++dest_it;
-                    from = next;
-                    next = std::next(from);
-                  }
-
-                /* Return the current name, i.e. the total
-                 * number of unique names. */
-                ++current_name;
-                return current_name;
-              },
-              start,dest_start
-          );
-
-      /* Wait for the threads to finish and add up all the totals. */
-      std::vector<pos_type> total_vec(dest_futs.size());
-      std::transform(dest_futs.begin(),dest_futs.end(),total_vec.begin(),
-          [](future<pos_type> &fut){ return fut.get(); }
-      );
-      pos_type total_names
-      { rlxutil::algorithm::make_cumulative(total_vec.begin(),total_vec.end()) };
-
-      /* From the second thread on, all threads require post-correction
-       * since the names they created start at 0 but need to start at
-       * wherever the previous thread ended. */
-      auto correction_futs =
-          portions.apply_dynargs(dest_start,dest_end,
-              [](DestIt from, DestIt to, bool skip, size_t initial)
-              {
-                if (!skip)
-                  while (from != to) {
-                      *from += initial;
-                      ++from;
-                  }
-              },
-              arg_generator([&total_vec](size_t thread)
-              {
-                if (thread == 0)
-                  return make_tuple(true,(pos_type)0);
-                return make_tuple(false,total_vec[thread-1]);
-              })
-          );
-
-      /* Wait for threads to finish. */
-      wait_for(correction_futs);
-
-      /* Return a pair { bool , vec } where bool is true if all new
-       * lexicographical names were unique, and vec is the vector with
-       * the new names. */
-      pos_type original_size = distance(start,end);
-      return (total_names == original_size) ? recursion::unneeded : recursion::needed;
-    }
-
-    /**
-     * Given the container type for the input trigrams
-     * (e.g. std::vector<TrigramImpl<...>>), determines
-     * the type we expect the elements of the destination
-     * container for lexicographical renaming to have.
-     */
-    template <typename InputVector>
-    struct std_dest_element
-    {
-      typedef typename rlxutil::deref<decltype(std::declval<InputVector>().begin())>::type elem_type;
-      typedef typename elem_type::pos_type type;
-    };
-
-    template <typename InpVector>
-    using result_type =
-        std::pair<recursion,std::vector<typename std_dest_element<InpVector>::type>>;
-
-    /**
-     * The `apply()` function returns a result that includes information
-     * about whether further recusion is required, as well as the actual
-     * vector of lexicographical names. Use the function below to
-     * extract information about whether recusion is needed:
-     *
-     *     is<recusion::needed>(result)
-     */
-    template <recursion val, typename OutVector>
-    static bool is(const std::pair<recursion,OutVector> &result)
-    { return (result.first == val); }
-
-    /**
-     * Extract the new (lexicographically renamed) string (i.e.,
-     * chracter vector) from the results of lexicographical
-     * renaming. This moves the string out of the result; so
-     * it can be done only once for any result object. (Later
-     * attempts to do it again will return an empty vector.)
-     *
-     *     auto result = lexicographical_renaming<...>.apply();
-     *     parallel_vector<...> vec = move_newstring_from(result);
-     */
-    template <typename OutVector>
-    static typename std::remove_reference<OutVector>::type &&
-    move_newstring_from(std::pair<recursion,OutVector> &result)
-    { return std::move(result.second); }
-
-    /**
-     * Access to the new (lexicographically renamed) string.
-     */
-    template <typename OutVector>
-    static const OutVector &newstring_of(
-        const std::pair<recursion,OutVector> &result)
-    { return result.second; }
-
-    /**
-     * Access to the new (lexicographically renamed) string.
-     */
-    template <typename OutVector>
-    static OutVector &newstring_of(std::pair<recursion,OutVector> &result)
-    { return result.second; }
-
-    /**
-     * Perform lexicographical renaming on a lexicographically sorted vector
-     * of trigrams. This produces a string (represented as parallel_vector
-     * of characters) that contains one character (i.e. one integer) for
-     * every trigram of the input vector. The integers will start with 0 and
-     * increment for every unique trigram where it occurs for the first time.
-     *
-     * Usage:
-     *
-     *     unsigned threads
-     *     { 4 };
-     *     // ...
-     *     std::vector<TrigramImpl<...>> trigrams;
-     *     rlxutil::parallel::portions portions
-     *     { trigrams.begin(), trigrams.end(), threads };
-     *     // ...
-     *     typedef lexicographical_renaming lex;
-     *
-     *     auto result    = lex::apply(trigrams,portions);
-     *     auto newstring = lex::move_newstring_from(result);
-     *     if (lex::is<recursion::needed>(result))
-     *       // perform recursion...
-     *
-     */
-    template <typename InpVector> static
-    result_type<InpVector> apply(InpVector &trigrams, rlxutil::parallel::portions &portions)
-    {
-      typedef typename std_dest_element<InpVector>::type pos_type;
-      std::vector<pos_type> dest_vec(trigrams.size());
-      lexicographical_renaming::recursion flag = apply(
-          trigrams.begin(),trigrams.end(),portions,dest_vec.begin(),dest_vec.end());
-      return { flag , std::move(dest_vec) };
-    }
-
-  };
-
-  template <typename InpVector> lexicographical_renaming::result_type<InpVector>
-  rename_lexicographically(
-      InpVector &trigrams, rlxutil::parallel::portions &portions)
-  {
-    return lexicographical_renaming::apply(trigrams,portions);
-  }
-
-  template <typename InpVector> lexicographical_renaming::result_type<InpVector>
-  rename_lexicographically(InpVector &trigrams)
-  {
-    rlxutil::parallel::portions portions
-    { trigrams.begin(), trigrams.end(), 4 };
-    return lexicographical_renaming::apply(trigrams,portions);
   }
 
 }

@@ -32,6 +32,15 @@ namespace rlxutil {
   { typedef typename std::remove_reference<decltype(*(std::declval<T>()))>::type type; };
 
   /**
+   * Use this to compute, at compile time, the type of the result of
+   * dereferencing an expression of type `T`. This works with pointers,
+   * iterators and anything that has a unary `operator*`.
+   */
+  template <typename T>
+  struct elemtype
+  { typedef typename std::remove_reference<decltype(*(std::declval<T>().begin()))>::type type; };
+
+  /**
    * Use this to check, at compile time, whether an assignment `T1 = T2;`
    * is possible without loosing information. This will only work for
    * fundamental data types. It basically checks whether `T1` is identical
