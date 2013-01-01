@@ -61,7 +61,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_lexicographical_renaming)
   std::vector<pos_type> expected
   { 0,1,2,2,2,2,3,4,4,4,5,5,5,5,5,6,6,7,8,9,10,11,12,13,14,15 };
 
-  typedef rlxalgo::lexicographical_renaming<> lex;
+  typedef rlxalgo::lexicographical_renaming lex;
 
   auto results = rlxalgo::rename_lexicographically(input,
       sux::trigram_tools::content_equal<sux::TGImpl::pointer,char,pos_type>);

@@ -16,21 +16,23 @@ namespace rlxalgo {
   template <typename T> using deref     = typename rlxutil::deref<T>::type;
   template <typename T> using elem_type = typename rlxutil::elemtype<T>::type;
 
-  /**
-   * Types of lexicographical renaming.
-   * If you want to use renamer::skew, you need to include the
-   * header skew_lexicographical_renaming.hpp in addition to this
-   * one.
-   */
-  enum class renamer { std , skew };
-
-  template <renamer method = renamer::std>
-  struct lexicographical_renaming;
-
-  template <>
-  struct lexicographical_renaming<renamer::std>
+  struct lexicographical_renaming
   {
     enum class recursion : bool { unneeded , needed };
+
+    template <typename Fun>
+    struct is_posmap
+    {
+      typedef rlxutil::function_traits<Fun> traits;
+      static constexpr bool value =
+          ((traits::arity == 1)
+              && (std::is_integral<typename traits::template arg<0>::type>::value)
+              && (std::is_integral<typename traits::result_type>::value));
+    };
+
+    template <typename Pos>
+    static Pos std_posmap(Pos pos)
+    { return pos; }
 
     /**
      * Create new lexicographical names in another container.
@@ -38,12 +40,17 @@ namespace rlxalgo {
      *    name was given to each unique trigram (recusion::unneeded), or
      *    not (recusion::needed).
      */
-    template <typename It, typename DestIt>
+    template <typename It, typename DestIt,
+              typename Posmap = decltype(std_posmap<typename deref<It>::pos_type>)>
     static recursion apply(
-        It start, It end,
+        It                           start,
+        It                           end,
         rlxutil::parallel::portions &portions,
-        DestIt dest_start, DestIt dest_end,
-        bool (&eq)(const deref<It> &, const deref<It> &))
+        DestIt                       dest_start,
+        DestIt                       dest_end,
+        bool                         (&eq)      (const deref<It> &, const deref<It> &),
+        typename std::enable_if<is_posmap<Posmap>::value,Posmap>::type &&posmap =
+            std_posmap<typename deref<It>::pos_type>)
     {
       using std::move;
       using std::size_t;
@@ -53,14 +60,13 @@ namespace rlxalgo {
       using std::accumulate;
       using std::distance;
 
-      using rlxutil::deref;
       using rlxutil::is_compatible;
       using rlxutil::parallel::tools::wait_for;
       using rlxutil::parallel::tools::arg_generator;
 
-      typedef typename deref<It>::type      elem_type;
+      typedef deref<It>                     elem_type;
       typedef typename elem_type::pos_type  pos_type;
-      typedef typename deref<DestIt>::type  dest_type;
+      typedef deref<DestIt>                 dest_type;
       typedef rlxutil::parallel::portions::adjustment adjustment;
 
       /* Verify that the destination vector has the right element
@@ -99,7 +105,7 @@ namespace rlxalgo {
        * created by that thread. */
       auto dest_futs =
           portions.apply(start,end,
-              [&eq](It from, It to, It beg, DestIt dest_beg)
+              [&eq,&posmap](It from, It to, It beg, DestIt dest_beg)
               {
                 pos_type current_name
                 { 0 };
@@ -107,18 +113,13 @@ namespace rlxalgo {
                 if (from == to)
                   return current_name;
 
-                DestIt dest_it
-                { dest_beg + distance(beg,from) };
-
-                *dest_it = current_name;
-                ++dest_it;
+                *(dest_beg + posmap(distance(beg,from))) = current_name;
                 It next = std::next(from);
                 while (next != to)
                   {
                     if (!eq(*from,*next))
                       ++current_name;
-                    *dest_it = current_name;
-                    ++dest_it;
+                    *(dest_beg + posmap(distance(beg,next))) = current_name;
                     from = next;
                     ++next;
                   }
@@ -143,20 +144,20 @@ namespace rlxalgo {
        * since the names they created start at 0 but need to start at
        * wherever the previous thread ended. */
       auto correction_futs =
-          portions.apply_dynargs(dest_start,dest_end,
-              [](DestIt from, DestIt to, bool skip, size_t initial)
+          portions.apply_dynargs(start,end,
+              [&posmap](It from, It to, It beg, DestIt dest_beg, bool skip, size_t initial)
               {
                 if (!skip)
                   while (from != to) {
-                      *from += initial;
+                      *(dest_beg + posmap(distance(beg,from))) += initial;
                       ++from;
                   }
               },
-              arg_generator([&total_vec](size_t thread)
+              arg_generator([start,dest_start,&total_vec](size_t thread)
               {
                 if (thread == 0)
-                  return make_tuple(true,(pos_type)0);
-                return make_tuple(false,total_vec[thread-1]);
+                  return make_tuple(start,dest_start,true,(pos_type)0);
+                return make_tuple(start,dest_start,false,total_vec[thread-1]);
               })
           );
 
@@ -253,36 +254,57 @@ namespace rlxalgo {
      *       // perform recursion...
      *
      */
-    template <typename InpVector> static
-    result_type<InpVector> apply(
-        InpVector &trigrams, rlxutil::parallel::portions &portions,
-        bool (&eq)(const elem_type<InpVector>&, const elem_type<InpVector> &))
+    template <typename InpVector,
+              typename Posmap = decltype(std_posmap<typename elem_type<InpVector>::pos_type>)>
+    static result_type<InpVector> apply(
+        InpVector                   &trigrams,
+        rlxutil::parallel::portions &portions,
+        bool                        (&eq)(const elem_type<InpVector>&, const elem_type<InpVector> &),
+        typename std::enable_if<is_posmap<Posmap>::value,Posmap>::type &&posmap =
+            std_posmap<typename elem_type<InpVector>::pos_type>)
     {
+      using std::forward;
       typedef typename std_dest_element<InpVector>::type pos_type;
       std::vector<pos_type> dest_vec(trigrams.size());
       lexicographical_renaming::recursion flag = apply(
-          trigrams.begin(),trigrams.end(),portions,dest_vec.begin(),dest_vec.end(),eq);
+          trigrams.begin(),trigrams.end(),portions,dest_vec.begin(),dest_vec.end(),
+          eq,forward<Posmap>(posmap));
       return { flag , std::move(dest_vec) };
     }
 
   };
 
-  template <typename InpVector> lexicographical_renaming<>::result_type<InpVector>
-  rename_lexicographically(
-      InpVector &trigrams, rlxutil::parallel::portions &portions,
-      bool (&eq)(const elem_type<InpVector> &, const elem_type<InpVector> &))
+  template
+    <typename InpVector,
+     typename Posmap =
+         decltype(lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)>
+  lexicographical_renaming::result_type<InpVector> rename_lexicographically(
+      InpVector                   &trigrams,
+      rlxutil::parallel::portions &portions,
+      bool                        (&eq)(const elem_type<InpVector> &, const elem_type<InpVector> &),
+      typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,Posmap>::type &&posmap =
+          lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)
   {
-    return lexicographical_renaming<>::apply(trigrams,portions,eq);
+    using std::forward;
+    return lexicographical_renaming::apply(trigrams,portions,eq,forward<Posmap>(posmap));
   }
 
-  template <typename InpVector> lexicographical_renaming<>::result_type<InpVector>
-  rename_lexicographically(InpVector &trigrams,
-      bool (&eq)(const elem_type<InpVector> &, const elem_type<InpVector> &),
-      unsigned threads = 4)
+  template
+    <typename InpVector,
+     typename Posmap =
+         decltype(lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)>
+  lexicographical_renaming::result_type<InpVector> rename_lexicographically(
+      InpVector   &trigrams,
+      bool        (&eq)       (const elem_type<InpVector> &, const elem_type<InpVector> &),
+      unsigned    threads = 4,
+      typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,Posmap>::type &&posmap =
+          lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)
   {
+    using std::forward;
+
     rlxutil::parallel::portions portions
     { trigrams.begin(), trigrams.end(), threads };
-    return lexicographical_renaming<>::apply(trigrams,portions,eq);
+    return lexicographical_renaming::apply(trigrams,portions,eq,forward<Posmap>(posmap));
   }
 
 }
