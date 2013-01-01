@@ -18,11 +18,53 @@
 #include "../util/more_type_traits.hpp"
 #include "alphabet.hpp"
 #include "trigram.hpp"
+#include "lexicographical_renaming.hpp"
 
 namespace sux {
   namespace skew {
 
     template <typename T> using noref = std::remove_reference<T>::type;
+
+    template <typename Text, typename InpVector>
+    lexicographical_renaming::result_type<InpVector> rename_lexicographically(
+        Text                        &text,
+        InpVector                   &trigrams,
+        rlxutil::parallel::portions &portions,
+        std::size_t                  center)
+    {
+      typedef typename rlxutil::elemtype<InpVector>::type elem_type;
+      typedef typename elem_type::char_type char_type;
+      typedef typename elem_type::pos_type  pos_type;
+
+      return lexicographical_renaming::apply(trigrams,portions,
+          sux::trigram_tools::content_equal<elem_type::impl,char_type,pos_type>,
+          [center,&text,&trigrams](pos_type index)
+                {
+                   const pos_type pos = pos_of(text.begin(),trigrams[index]);
+                   const pos_type mod = pos % 3;
+                   const pos_type div = pos / 3;
+                   return (mod == 1 ? div : center+div);
+                });
+    }
+
+    template <typename InpVector,
+              typename Posmap =
+                  decltype(lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)>
+    lexicographical_renaming::result_type<InpVector> rename_lexicographically(
+        InpVector   &trigrams,
+        bool        (&eq)       (const elem_type<InpVector> &, const elem_type<InpVector> &),
+        unsigned    threads = 4,
+        Posmap      &&posmap =
+            lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>,
+        typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,int>::type = 0)
+    {
+      using std::forward;
+
+      rlxutil::parallel::portions portions
+      { trigrams.begin(), trigrams.end(), threads };
+      return lexicographical_renaming::apply(trigrams,portions,eq,forward<Posmap>(posmap));
+    }
+
 
     template <typename Pos, typename It>
     void make_suffix_array(It from, It to, unsigned threads = 4)
