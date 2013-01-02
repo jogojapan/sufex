@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_skew_make_s0_test)
       rlxalgo::lexicographical_renaming::newstring_of(renamed);
 
   auto s0_trigrams =
-      rlxalgo::skew::make_s0_trigrams<sux::TGImpl::structure,char,pos_type>(
+      rlxalgo::skew::make_s0_trigrams<sux::TGImpl::structure>(
           text.begin(),text.end(),
           name_str.begin(),name_str.end(),
           1);

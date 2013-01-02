@@ -73,8 +73,11 @@ namespace rlxalgo {
       { return (_pos == other._pos && _ch == other._ch && _renamed_s1 == other._renamed_s1); }
     };
 
-    template <sux::TGImpl tgimpl, typename Char, typename Pos, typename It, typename LexIt>
-    typename sux::TrigramContainer<S0TrigramImpl<tgimpl,Char,Pos>>::vec_type
+    template <sux::TGImpl tgimpl, typename It, typename LexIt>
+    typename sux::TrigramContainer
+             <S0TrigramImpl
+                <tgimpl,typename rlxtype::deref<It>::type,typename rlxtype::deref<LexIt>::type>>
+                ::vec_type
     make_s0_trigrams(It from, It to, LexIt lex_from, LexIt lex_to, unsigned threads)
     {
       using namespace rlx::algotypes;
@@ -82,15 +85,8 @@ namespace rlxalgo {
       using it    = char_it<It>;
       using lexit = char_it<LexIt>;
 
-      static_assert(std::is_same<Char,chtype<it>>::value,
-          "The character type defined by the iterator and "
-          "the given parameter Char must be identical");
-      static_assert(std::is_same<Pos,chtype<lexit>>::value,
-          "The pos type defined by the lexit iterator and "
-          "the given parameter Pos must be identical");
-
       typedef rlxutil::parallel::portions::adjustment                adjustment;
-      typedef S0TrigramImpl<tgimpl,Char,Pos>                         trigram_type;
+      typedef S0TrigramImpl<tgimpl,chtype<it>,chtype<lexit>>         trigram_type;
       typedef typename sux::TrigramContainer<trigram_type>::vec_type vec_type;
 
       if (distance(lex_from,lex_to) < distance(from,to) / 3)
@@ -104,12 +100,14 @@ namespace rlxalgo {
         { return (distance(beg,loc) % 3 != 0 ? adjustment::needed : adjustment::unneeded); }
       };
 
+      typedef chtype<lexit> pos_type;
+
       auto futs =
           portions.apply(from,to,
               [from,lex_from,&vec](It local_from, It local_to)
               {
-                Pos pos
-                { static_cast<Pos>(distance(from,local_from)) };
+                pos_type pos
+                { static_cast<pos_type>(distance(from,local_from)) };
                 while (local_from != local_to)
                   {
                     if (pos % 3 == 0) {
