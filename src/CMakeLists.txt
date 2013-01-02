@@ -80,3 +80,7 @@ add_test (tupletools_test ${test_bin_dir}/tupletools_test)
 
 #add_executable (${test_bin_dir}/testapp sux/test/testapp.cpp)
 #target_link_libraries (${test_bin_dir}/testapp ${Boost_LIBRARIES} ${GLOG_LIBRARY})
+
+add_executable (${test_bin_dir}/skew_test sux/test/skew_test.cpp)
+target_link_libraries (${test_bin_dir}/skew_test ${Boost_LIBRARIES} ${GLOG_LIBRARY})
+add_test (skew_test ${test_bin_dir}/skew_test)

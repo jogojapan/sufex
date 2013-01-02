@@ -10,11 +10,12 @@
 
 #include <utility>
 #include "../util/more_type_traits.hpp"
+#include "../util/more_algorithm.hpp"
 
 namespace rlxalgo {
 
-  template <typename T> using deref     = typename rlxutil::deref<T>::type;
-  template <typename T> using elem_type = typename rlxutil::elemtype<T>::type;
+  template <typename T> using deref     = typename rlxtype::deref<T>::type;
+  template <typename T> using elem_type = typename rlxtype::elemtype<T>::type;
 
   struct lexicographical_renaming
   {
@@ -23,7 +24,7 @@ namespace rlxalgo {
     template <typename Fun>
     struct is_posmap
     {
-      typedef rlxutil::function_traits<Fun> traits;
+      typedef rlxtype::function_traits<Fun> traits;
       static constexpr bool value =
           ((traits::arity == 1)
               && (std::is_integral<typename traits::template arg<0>::type>::value)
@@ -60,7 +61,7 @@ namespace rlxalgo {
       using std::accumulate;
       using std::distance;
 
-      using rlxutil::is_compatible;
+      using rlxtype::is_compatible;
       using rlxutil::parallel::tools::wait_for;
       using rlxutil::parallel::tools::arg_generator;
 
@@ -180,7 +181,7 @@ namespace rlxalgo {
     template <typename InputVector>
     struct std_dest_element
     {
-      typedef typename rlxutil::deref<decltype(std::declval<InputVector>().begin())>::type elem_type;
+      typedef typename rlxtype::deref<decltype(std::declval<InputVector>().begin())>::type elem_type;
       typedef typename elem_type::pos_type type;
     };
 
@@ -276,14 +277,13 @@ namespace rlxalgo {
 
   template
     <typename InpVector,
-     typename Posmap =
-         decltype(lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)>
+     typename Posmap = decltype(lexicographical_renaming::std_posmap
+         <typename elem_type<InpVector>::pos_type>)>
   lexicographical_renaming::result_type<InpVector> rename_lexicographically(
       InpVector                   &trigrams,
       rlxutil::parallel::portions &portions,
       bool                        (&eq)(const elem_type<InpVector> &, const elem_type<InpVector> &),
-      Posmap                      &&posmap =
-          lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>,
+      Posmap                      &&posmap = lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>,
       typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,int>::type = 0)
   {
     using std::forward;
@@ -291,20 +291,20 @@ namespace rlxalgo {
   }
 
   template <typename InpVector,
-            typename Posmap =
-                decltype(lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)>
+            typename Posmap = decltype(lexicographical_renaming::std_posmap
+                <typename elem_type<InpVector>::pos_type>)>
   lexicographical_renaming::result_type<InpVector> rename_lexicographically(
       InpVector   &trigrams,
-      bool        (&eq)       (const elem_type<InpVector> &, const elem_type<InpVector> &),
-      unsigned    threads = 4,
-      Posmap      &&posmap =
-          lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>,
+      bool        (&eq)(const elem_type<InpVector> &, const elem_type<InpVector> &),
+      unsigned    threads  = 4,
+      Posmap      &&posmap = lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>,
       typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,int>::type = 0)
   {
     using std::forward;
 
     rlxutil::parallel::portions portions
     { trigrams.begin(), trigrams.end(), threads };
+
     return lexicographical_renaming::apply(trigrams,portions,eq,forward<Posmap>(posmap));
   }
 

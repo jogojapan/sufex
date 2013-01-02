@@ -28,6 +28,8 @@ namespace rlxutil {
       template <typename Fun>
       Fun &&arg_generator(Fun&& fun)
       {
+        using rlxtype::function_traits;
+        using rlxtype::is_instance_of;
         static_assert(function_traits<Fun>::arity == 1,
             "For generator(fun) to work, fun needs to be a function that takes exactly one integer argument.");
         typedef typename function_traits<Fun>::template arg<0>::type first_arg_type;
@@ -43,9 +45,9 @@ namespace rlxutil {
       struct is_arg_generator
       {
         static constexpr bool value =
-            (function_traits<Fun>::arity == 1
-                && std::is_integral<typename function_traits<Fun>::template arg<0>::type>::value
-                && is_instance_of<std::tuple,typename function_traits<Fun>::result_type>::value
+            (rlxtype::function_traits<Fun>::arity == 1
+                && std::is_integral<typename rlxtype::function_traits<Fun>::template arg<0>::type>::value
+                && rlxtype::is_instance_of<std::tuple,typename rlxtype::function_traits<Fun>::result_type>::value
             );
       };
 
@@ -155,10 +157,10 @@ namespace rlxutil {
       { assign(start,end,num_portions); }
 
       template <typename It, typename BoundAdjust>
-      portions(It start, It end, diff_t num_portions,
+      portions(It start, It end, std::size_t num_portions,
           BoundAdjust &&boundary_adjuster,
           diff_t min_portion_size = 10000,
-          typename std::enable_if<is_boundary_adjuster<BoundAdjust,It>::value,unsigned>::type dummy = 0) :
+          typename std::enable_if<is_boundary_adjuster<BoundAdjust,It>::value,unsigned>::type = 0) :
         _min_portion_size(min_portion_size),
         _offsets(),
         _total_range(std::distance(start,end))
@@ -301,7 +303,7 @@ namespace rlxutil {
        */
       template <typename It, typename Fun, typename Generator>
       typename std::enable_if<tools::is_arg_generator<Generator>::value,
-         std::vector<typename std::future<typename function_traits<Fun>::result_type>>>::type
+         std::vector<typename std::future<typename rlxtype::function_traits<Fun>::result_type>>>::type
       apply_dynargs(It from, It to, Fun&& fun, Generator gen) const
       {
         using std::pair;
@@ -313,7 +315,7 @@ namespace rlxutil {
         using std::make_tuple;
         using std::tuple_cat;
 
-        typedef typename function_traits<Fun>::result_type result_type;
+        typedef typename rlxtype::function_traits<Fun>::result_type result_type;
 
         if (_offsets.empty())
           throw portion_error("Attempt to apply empty portions object to a range");

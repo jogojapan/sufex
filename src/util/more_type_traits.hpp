@@ -8,7 +8,7 @@
 #ifndef MORE_TYPE_TRAITS_HPP_
 #define MORE_TYPE_TRAITS_HPP_
 
-namespace rlxutil {
+namespace rlxtype {
 
   /**
    * Use this to check at compile-time whether Instance is a template-instantiation

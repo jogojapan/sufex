@@ -14,10 +14,10 @@ namespace rlxutil {
   namespace algorithm {
 
     template <typename It>
-    typename deref<It>::type make_cumulative(It from, It to)
+    typename rlxtype::deref<It>::type make_cumulative(It from, It to)
     {
       using std::swap;
-      typedef typename deref<It>::type elem_type;
+      typedef typename rlxtype::deref<It>::type elem_type;
 
       elem_type total
       { };

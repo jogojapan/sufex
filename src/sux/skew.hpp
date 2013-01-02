@@ -16,55 +16,108 @@
 #include <stack>
 
 #include "../util/more_type_traits.hpp"
+#include "../types/algotypes.hpp"
 #include "alphabet.hpp"
 #include "trigram.hpp"
+#include "../util/parallelization.hpp"
 #include "lexicographical_renaming.hpp"
 
-namespace sux {
+namespace rlxalgo {
   namespace skew {
 
-    template <typename T> using noref = std::remove_reference<T>::type;
+    template <typename T> using noref = typename std::remove_reference<T>::type;
 
     template <typename Text, typename InpVector>
     lexicographical_renaming::result_type<InpVector> rename_lexicographically(
-        Text                        &text,
-        InpVector                   &trigrams,
+        const Text                  &text,
+        const InpVector             &trigrams,
         rlxutil::parallel::portions &portions,
         std::size_t                  center)
     {
-      typedef typename rlxutil::elemtype<InpVector>::type elem_type;
-      typedef typename elem_type::char_type char_type;
-      typedef typename elem_type::pos_type  pos_type;
+      using namespace rlx::algotypes;
+      using namespace sux::trigram_tools;
+      typedef ngram_vec<InpVector> vec;
 
       return lexicographical_renaming::apply(trigrams,portions,
-          sux::trigram_tools::content_equal<elem_type::impl,char_type,pos_type>,
-          [center,&text,&trigrams](pos_type index)
+          sux::trigram_tools::content_equal<elemtype<vec>::impl,chtype<vec>,postype<vec>>,
+          [center,&text,&trigrams](postype<vec> index)
                 {
-                   const pos_type pos = pos_of(text.begin(),trigrams[index]);
-                   const pos_type mod = pos % 3;
-                   const pos_type div = pos / 3;
+                   const postype<vec> pos = pos_of(text.begin(),trigrams[index]);
+                   const postype<vec> mod = pos % 3;
+                   const postype<vec> div = pos / 3;
                    return (mod == 1 ? div : center+div);
                 });
     }
 
-    template <typename InpVector,
-              typename Posmap =
-                  decltype(lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>)>
+    template <typename Text, typename InpVector>
     lexicographical_renaming::result_type<InpVector> rename_lexicographically(
-        InpVector   &trigrams,
-        bool        (&eq)       (const elem_type<InpVector> &, const elem_type<InpVector> &),
-        unsigned    threads = 4,
-        Posmap      &&posmap =
-            lexicographical_renaming::std_posmap<typename elem_type<InpVector>::pos_type>,
-        typename std::enable_if<lexicographical_renaming::is_posmap<Posmap>::value,int>::type = 0)
+        const Text &text, const InpVector &trigrams, std::size_t center, unsigned threads = 4)
     {
-      using std::forward;
-
       rlxutil::parallel::portions portions
       { trigrams.begin(), trigrams.end(), threads };
-      return lexicographical_renaming::apply(trigrams,portions,eq,forward<Posmap>(posmap));
+
+      return rename_lexicographically(text,trigrams,portions,center);
     }
 
+    template <sux::TGImpl tgimpl, typename Char, typename Pos>
+    struct S0TrigramImpl;
+
+    template <typename Char, typename Pos>
+    struct S0TrigramImpl<sux::TGImpl::structure,Char,Pos>
+    {
+      Pos   _pos;        // Position of S0-trigram
+      Char  _ch;         // First character
+      Pos   _renamed_s1; // Lexicographically renamed trigram that follows
+    };
+
+    template <sux::TGImpl tgimpl, typename Char, typename Pos, typename It, typename LexIt>
+    typename sux::TrigramContainer<S0TrigramImpl<tgimpl,Char,Pos>>::vec_type
+    make_s0_trigrams(It from, It to, LexIt lex_from, LexIt lex_to, unsigned threads)
+    {
+      using namespace rlx::algotypes;
+      using std::distance;
+      using it    = char_it<It>;
+      using lexit = char_it<LexIt>;
+
+      static_assert(std::is_same<Char,chtype<it>>::value,
+          "The character type defined by the iterator and "
+          "the given parameter Char must be identical");
+      static_assert(std::is_same<Pos,chtype<lexit>>::value,
+          "The pos type defined by the lexit iterator and "
+          "the given parameter Pos must be identical");
+
+      typedef rlxutil::parallel::portions::adjustment                adjustment;
+      typedef S0TrigramImpl<tgimpl,Char,Pos>                         trigram_type;
+      typedef typename sux::TrigramContainer<trigram_type>::vec_type vec_type;
+
+      if (distance(lex_from,lex_to) < distance(from,to) / 3)
+        throw std::out_of_range("Length of lexicographically renamed string not large enough");
+
+      vec_type vec(distance(from,to) / 3);
+
+      rlxutil::parallel::portions portions
+      { from , to , threads ,
+        [](It beg, It loc, It /*end*/)
+        { return (distance(beg,loc) % 3 == 0 ? adjustment::needed : adjustment::unneeded); }
+      };
+
+      portions.apply(from,to,
+          [lex_from,&vec](It local_from, It local_to, It beg)
+          {
+            Pos pos
+            { static_cast<Pos>(distance(beg,local_from)) };
+            while (local_from != local_to)
+              {
+                if (pos % 3 == 0) {
+                    vec[pos/3] = trigram_type
+                        { pos , *local_from , *(lex_from + (pos/3)) };
+                }
+                ++pos;
+              }
+          },
+          from
+          );
+    }
 
     template <typename Pos, typename It>
     void make_suffix_array(It from, It to, unsigned threads = 4)
@@ -74,7 +127,8 @@ namespace sux {
       using std::uintmax_t;
       using std::distance;
 
-      typedef typename rlxutil::deref<It>::type char_type;
+      using namespace rlx::algotypes;
+      typedef typename char_it<It>::type inp;
 
       static_assert(is_integral<Pos>::value,
           "The position type used for make_suffix_array must be an integral type.");
@@ -84,8 +138,8 @@ namespace sux {
               "is not large enough for the given input string");
 
       using sux::AlphabetClass;
-      using lex      = sux::lexicographical_renaming;
-      using recusion = lex::recusion;
+      using lex       = lexicographical_renaming;
+      using recursion = lex::recursion;
 
       /* Extract 2,3-trigrams. */
       auto trigrams = sux::extract_23trigrams<Pos>(from,to);
@@ -93,8 +147,7 @@ namespace sux {
       sux::sort_23trigrams<AlphabetClass::sparse>(trigrams,threads);
       /* Generate an integer alphabet for them according to
        * their sorting order. */
-      auto renamed_trigrams =
-          sux::rename_lexicographically(trigrams,threads);
+      auto renamed_trigrams = rename_lexicographically(trigrams,threads);
 
       using std::stack;
       using std::pair;
@@ -108,19 +161,17 @@ namespace sux {
               sux::extract_23trigrams<Pos>(renamed_string.begin(),renamed_string.end());
           sux::sort_23trigrams<AlphabetClass::zero_range>(renamed_trigrams,threads);
 
-          stack<pair<noref<decltype(renamed_string)>,noref<decltype(renamed_trigrams)>> workpile
+          stack<pair<noref<decltype(renamed_string)>,noref<decltype(renamed_trigrams)>>> workpile
               { };
 
           workpile.emplace(move(renamed_string),move(renamed_trigrams));
           while (!workpile.empty())
             {
-              renamed_trigrams =
-                  sux::rename_lexicographically(std::get<1>(workpile.top()),threads);
+              renamed_trigrams = rename_lexicographically(std::get<1>(workpile.top()),threads);
               if (lex::is<recursion::needed>(renamed_trigrams))
                 {
                   /* Recursion. */
-                  renamed_string =
-                      lex::move_newstring_from(renamed_trigrams);
+                  renamed_string = lex::move_newstring_from(renamed_trigrams);
                   renamed_trigrams =
                       sux::extract_23trigrams<Pos>(renamed_string.begin(),renamed_string.end());
                   sux::sort_23trigrams<AlphabetClass::zero_range>(renamed_trigrams,threads);
