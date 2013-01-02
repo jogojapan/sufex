@@ -68,6 +68,9 @@ namespace rlxalgo {
       Pos   _pos;        // Position of S0-trigram
       Char  _ch;         // First character
       Pos   _renamed_s1; // Lexicographically renamed trigram that follows
+
+      bool operator==(const S0TrigramImpl &other) const
+      { return (_pos == other._pos && _ch == other._ch && _renamed_s1 == other._renamed_s1); }
     };
 
     template <sux::TGImpl tgimpl, typename Char, typename Pos, typename It, typename LexIt>
@@ -93,30 +96,33 @@ namespace rlxalgo {
       if (distance(lex_from,lex_to) < distance(from,to) / 3)
         throw std::out_of_range("Length of lexicographically renamed string not large enough");
 
-      vec_type vec(distance(from,to) / 3);
+      vec_type vec(distance(from,to) / 3 + (distance(from,to) % 3 != 0 ? 1 : 0));
 
       rlxutil::parallel::portions portions
       { from , to , threads ,
         [](It beg, It loc, It /*end*/)
-        { return (distance(beg,loc) % 3 == 0 ? adjustment::needed : adjustment::unneeded); }
+        { return (distance(beg,loc) % 3 != 0 ? adjustment::needed : adjustment::unneeded); }
       };
 
-      portions.apply(from,to,
-          [lex_from,&vec](It local_from, It local_to, It beg)
-          {
-            Pos pos
-            { static_cast<Pos>(distance(beg,local_from)) };
-            while (local_from != local_to)
+      auto futs =
+          portions.apply(from,to,
+              [from,lex_from,&vec](It local_from, It local_to)
               {
-                if (pos % 3 == 0) {
-                    vec[pos/3] = trigram_type
-                        { pos , *local_from , *(lex_from + (pos/3)) };
-                }
-                ++pos;
-              }
-          },
-          from
-          );
+                Pos pos
+                { static_cast<Pos>(distance(from,local_from)) };
+                while (local_from != local_to)
+                  {
+                    if (pos % 3 == 0) {
+                        vec[pos/3] = trigram_type
+                            { pos , *local_from , *(lex_from + (pos/3)) };
+                    }
+                    ++pos;
+                    ++local_from;
+                  }
+              });
+
+      rlxutil::parallel::tools::wait_for(futs);
+      return vec;
     }
 
     template <typename Pos, typename It>

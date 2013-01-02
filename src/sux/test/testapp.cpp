@@ -5,63 +5,50 @@
  *      Author: jogojapan
  */
 
-#include <iterator>
-#include <algorithm>
-#include <functional>
 #include <iostream>
-#include <iomanip>
-#include <chrono>
-#include <ratio>
 #include <glog/logging.h>
 
 #include "../trigram.hpp"
-#include "../alphabet.hpp"
-#include "../../util/random.hpp"
-#include "../../util/proctime.hpp"
+#include "../lexicographical_renaming.hpp"
+#include "../skew.hpp"
 
 int main()
 {
-  typedef unsigned short Pos;
+  using sux::trigram_tools::to_str;
+  using sux::trigram_tools::pos_of;
 
-  typedef sux::TrigramMaker<sux::TGImpl::pointer,char,Pos>   maker;
-  typedef typename maker::trigram_type                       elem_type;
-  std::vector<elem_type> input {
-    elem_type { "aec" },
-    elem_type { "aef" },
-    elem_type { "bhj" },
-    elem_type { "bhj" },
-    elem_type { "bhj" },
-    elem_type { "bhj" },
-    elem_type { "dkh" },
-    elem_type { "dnr" },
-    elem_type { "dnr" },
-    elem_type { "dnr" },
-    elem_type { "eca" },
-    elem_type { "eca" },
-    elem_type { "eca" },
-    elem_type { "eca" },
-    elem_type { "eca" },
-    elem_type { "kuw" },
-    elem_type { "kuw" },
-    elem_type { "lpp" },
-    elem_type { "lpy" },
-    elem_type { "qqq" },
-    elem_type { "qxz" },
-    elem_type { "rst" },
-    elem_type { "rsu" },
-    elem_type { "rua" },
-    elem_type { "rub" },
-    elem_type { "ruc" }
-  };
+  typedef unsigned short                                          pos_type;
+  typedef sux::TrigramMaker<sux::TGImpl::pointer,char,pos_type>   maker;
+  typedef typename maker::trigram_type                            elem_type;
 
-  std::vector<Pos> expected
-  { 0,1,2,2,2,2,3,4,4,4,5,5,5,5,5,6,6,7,8,9,10,11,12,13,14,15 };
+  std::string text
+  { "ruxxysaxaaabdyduuuusuxyabxbxbbsbaxuxyuxasuxytsysbbbstxusyxstauwwyqtqysxuxyssyswwbbababbwbbwwww" };
 
-  typedef sux::lexicographical_renaming<> lex;
+  auto trigrams =
+      maker::make_23trigrams(text.begin(),text.end());
 
-  auto results = sux::rename_lexicographically(input);
-  std::vector<Pos> renamed_vec
-  { lex::move_newstring_from(results) };
+  sux::sort_23trigrams<sux::AlphabetClass::sparse>(trigrams,1);
 
+  const std::size_t center
+  { (trigrams.size() / 2) + (trigrams.size() % 2) };
+  auto renamed =
+      rlxalgo::skew::rename_lexicographically(text,trigrams,center,1);
+  auto &name_str =
+      rlxalgo::lexicographical_renaming::newstring_of(renamed);
+
+  auto s0_trigrams =
+      rlxalgo::skew::make_s0_trigrams<sux::TGImpl::structure,char,pos_type>(
+          text.begin(),text.end(),
+          name_str.begin(),name_str.end(),
+          1);
+
+  /* Debug output. */
+  for (const auto &trigram : s0_trigrams)
+    {
+      std::cout << trigram._pos
+          << '\t' << trigram._ch
+          << '\t' << trigram._renamed_s1
+          << '\n';
+    }
   return 0;
 }

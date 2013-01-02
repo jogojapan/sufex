@@ -48,15 +48,24 @@ BOOST_AUTO_TEST_CASE(sux_builder_skew_make_s0_test)
           name_str.begin(),name_str.end(),
           1);
 
-  /* Debug output. */
-  for (const auto &trigram : s0_trigrams)
-    {
-      std::cout << trigram._pos
-          << '\t' << trigram._ch
-          << '\t' << name_str[trigram._renamed_s1]
-          << '\n';
-    }
+//  /* Debug output. */
+//  for (const auto &trigram : s0_trigrams)
+//    {
+//      std::cout << trigram._pos
+//          << '\t' << trigram._ch
+//          << '\t' << name_str[trigram._renamed_s1]
+//          << '\n';
+//    }
 
+  std::remove_reference<decltype(s0_trigrams)>::type expected
+  { {0,'r',33},{3,'x',48},{6,'a',38},{9,'a',2},{12,'d',46},{15,'u',30},{18,'u',23},{21,'x',45},
+    {24,'b',40},{27,'x',8},{30,'s',6},{33,'x',34},{36,'y',32},{39,'a',23},{42,'x',53},{45,'s',49},
+    {48,'b',8},{51,'s',28},{54,'u',25},{57,'x',22},{60,'a',31},{63,'w',47},{66,'t',18},
+    {69,'s',42},{72,'x',50},{75,'s',51},{78,'w',35},{81,'b',1},{84,'a',9},{87,'w',9},{90,'w',36},
+    {93,'w',43}
+  };
+
+  BOOST_CHECK(equal(begin(expected),end(expected),begin(s0_trigrams)));
 }
 
 
