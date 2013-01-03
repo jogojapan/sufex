@@ -23,9 +23,11 @@
 #include "lexicographical_renaming.hpp"
 
 namespace rlxalgo {
+
   namespace skew {
 
-    template <typename T> using noref = typename std::remove_reference<T>::type;
+    template <typename T>     using noref    = typename std::remove_reference<T>::type;
+    template <typename... Ts> using sequence = std::vector;
 
     template <typename Text, typename InpVector>
     lexicographical_renaming::result_type<InpVector> rename_lexicographically(
@@ -74,10 +76,7 @@ namespace rlxalgo {
     };
 
     template <sux::TGImpl tgimpl, typename It, typename LexIt>
-    typename sux::TrigramContainer
-             <S0TrigramImpl
-                <tgimpl,typename rlxtype::deref<It>::type,typename rlxtype::deref<LexIt>::type>>
-                ::vec_type
+    typename sequence<S0TrigramImpl<tgimpl,rlxtype::deref<It>,rlxtype::deref<LexIt>>>
     make_s0_trigrams(It from, It to, LexIt lex_from, LexIt lex_to, unsigned threads)
     {
       using namespace rlx::algotypes;
@@ -87,12 +86,12 @@ namespace rlxalgo {
 
       typedef rlxutil::parallel::portions::adjustment                adjustment;
       typedef S0TrigramImpl<tgimpl,chtype<it>,chtype<lexit>>         trigram_type;
-      typedef typename sux::TrigramContainer<trigram_type>::vec_type vec_type;
 
       if (distance(lex_from,lex_to) < distance(from,to) / 3)
         throw std::out_of_range("Length of lexicographically renamed string not large enough");
 
-      vec_type vec(distance(from,to) / 3 + (distance(from,to) % 3 != 0 ? 1 : 0));
+      sequence<trigram_type>
+      vec(distance(from,to) / 3 + (distance(from,to) % 3 != 0 ? 1 : 0));
 
       rlxutil::parallel::portions portions
       { from , to , threads ,
@@ -121,6 +120,43 @@ namespace rlxalgo {
 
       rlxutil::parallel::tools::wait_for(futs);
       return vec;
+    }
+
+    template <typename It>
+    void sort_s0_trigrams(It from, It to, rlxutil::parallel::portions &portions)
+    {
+      using rlx::AlphabetClass;
+      using namespace rlx::alphabet_tools;
+
+      typedef typename rlx::algotypes::ngram_it<It>::type it;
+
+      /* For the first pass, based on lex array. */
+      auto succ_extractor = [](const elemtype<it> &trigram)
+      { return trigram._renamed_s1; };
+
+      /* For the second pass, based on the characers themselves. */
+      auto s0_extractor = [](const elemtype<it> &trigram)
+      { return trigram._ch; };
+
+      /* Temporary container. */
+      sequence<elemtype<it>> dest_vec(distance(from,to));
+
+      /* First pass. */ // TODO. Use AlphabetClass::zero_range here. But: make_freq_table isn't ready for that yet.
+      rlx::paralgo::bucket_sort<AlphabetClass::sparse>(
+          from,to,dest_vec.begin(),succ_extractor,portions);
+
+      /* We re-use the portions object for the second pass, although it
+       * is applied to dest_vec this time. This is ok, because portion
+       * boundaries do not really matter for bucket sort. */
+
+      /* Second pass. */
+      rlx::paralgo::bucket_sort<AlphabetClass::sparse>(
+          dest_vec.begin(),dest_vec.end(),from,s0_extractor,portions);
+    }
+
+    void merge_s0_s12()
+    {
+
     }
 
     template <typename Pos, typename It>
@@ -171,20 +207,24 @@ namespace rlxalgo {
           workpile.emplace(move(renamed_string),move(renamed_trigrams));
           while (!workpile.empty())
             {
-              renamed_trigrams = rename_lexicographically(std::get<1>(workpile.top()),threads);
-              if (lex::is<recursion::needed>(renamed_trigrams))
+              auto rec_renamed = rename_lexicographically(std::get<1>(workpile.top()),threads);
+              if (lex::is<recursion::needed>(rec_renamed))
                 {
                   /* Recursion. */
-                  renamed_string = lex::move_newstring_from(renamed_trigrams);
-                  renamed_trigrams =
-                      sux::extract_23trigrams<Pos>(renamed_string.begin(),renamed_string.end());
-                  sux::sort_23trigrams<AlphabetClass::zero_range>(renamed_trigrams,threads);
-                  workpile.emplace(move(renamed_string),move(renamed_trigrams));
+                  auto rec_text = lex::move_newstring_from(rec_renamed);
+                  auto rec_trigrams =
+                      sux::extract_23trigrams<Pos>(rec_text.begin(),rec_text.end());
+                  sux::sort_23trigrams<AlphabetClass::zero_range>(rec_trigrams,threads);
+                  workpile.emplace(move(rec_text),move(rec_trigrams));
                 }
               else
                 {
+                  auto rec_text = move(std::get<0>(workpile.top()));
+                  auto rec_lex  = lex::move_newstring_from(rec_renamed);
                   /* End of recursion. Wind up the workpile. */
-
+                  auto s0_trigrams =
+                      make_s0_trigrams(
+                          rec_text.begin(),rec_text.end(),rec_lex.begin(),rec_lex.end(),threads);
                 }
             }
         }

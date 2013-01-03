@@ -28,8 +28,7 @@ namespace rlxtype {
    * iterators and anything that has a unary `operator*`.
    */
   template <typename T>
-  struct deref
-  { typedef typename std::remove_reference<decltype(*(std::declval<T>()))>::type type; };
+  using deref = typename std::remove_reference<decltype(*(std::declval<T>()))>::type;
 
   /**
    * Use this to compute, at compile time, the element type of the given

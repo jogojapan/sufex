@@ -13,7 +13,7 @@
 
 #include "../util/parallelization.hpp"
 
-namespace sux {
+namespace rlx {
 
   /** Alphabet types:
    * sparse, a limited number of integers from a wide set of possible integers)

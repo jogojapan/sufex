@@ -349,7 +349,7 @@ namespace sux {
      * before the call. bucket_sizes must be prepared by the caller so it
      * provides the size of each bucket.
      */
-    template <typename Iterator, typename CharExtractor, typename Elem>
+    template <typename Iterator, typename CharExtractor>
     static void bucket_sort(
         Iterator           from,
         Iterator           to,
@@ -390,11 +390,11 @@ namespace sux {
       using std::make_tuple;
       using rlxtype::deref;
       using rlxtype::is_compatible;
-      using namespace alphabet_tools;
+      using namespace rlx::alphabet_tools;
       using rlxutil::parallel::tools::arg_generator;
       using rlxutil::parallel::tools::wait_for;
 
-      typedef typename deref<It>::type elem_type;
+      typedef deref<It> elem_type;
 
       /* Create a frequency list of characters. */
       auto frqtab_vec = portions.apply
@@ -484,10 +484,10 @@ namespace sux {
    * input iterators.
    */
   template <typename Pos, TGImpl tgimpl = TGImpl::arraytuple, typename It>
-  typename TrigramMaker<tgimpl,typename rlxtype::deref<It>::type,Pos>::trigram_vec_type
+  typename TrigramMaker<tgimpl,rlxtype::deref<It>,Pos>::trigram_vec_type
   extract_23trigrams(It from, It to)
   {
-    typedef typename rlxtype::deref<It>::type char_type;
+    typedef rlxtype::deref<It> char_type;
     return TrigramMaker<tgimpl,char_type,Pos>::make_23trigrams(from,to);
   }
 
