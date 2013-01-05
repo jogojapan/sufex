@@ -39,10 +39,10 @@ namespace sux {
 
   /** String representation of trigram implementation types. */
   template <TGImpl tgimpl> struct repr;
-  template <> struct repr<TGImpl::tuple>      { static constexpr const char *const str = "tuple"; };
-  template <> struct repr<TGImpl::arraytuple> { static constexpr const char *const str = "arraytuple"; };
-  template <> struct repr<TGImpl::structure>  { static constexpr const char *const str = "structure"; };
-  template <> struct repr<TGImpl::pointer>    { static constexpr const char *const str = "pointer"; };
+  template <> struct repr<TGImpl::tuple>      { static constexpr const char *str = "tuple"; };
+  template <> struct repr<TGImpl::arraytuple> { static constexpr const char *str = "arraytuple"; };
+  template <> struct repr<TGImpl::structure>  { static constexpr const char *str = "structure"; };
+  template <> struct repr<TGImpl::pointer>    { static constexpr const char *str = "pointer"; };
 
   template <TGImpl tgimpl, typename Char, typename Pos>
   struct TrigramImpl;

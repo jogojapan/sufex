@@ -14,8 +14,8 @@
 
 namespace rlxalgo {
 
-  template <typename T> using deref     = typename rlxtype::deref<T>::type;
-  template <typename T> using elem_type = typename rlxtype::elemtype<T>::type;
+  template <typename T> using deref     = rlxtype::deref<T>;
+  template <typename T> using elem_type = rlxtype::elemtype<T>;
 
   struct lexicographical_renaming
   {
@@ -181,7 +181,7 @@ namespace rlxalgo {
     template <typename InputVector>
     struct std_dest_element
     {
-      typedef typename rlxtype::deref<decltype(std::declval<InputVector>().begin())>::type elem_type;
+      typedef rlxtype::deref<decltype(std::declval<InputVector>().begin())> elem_type;
       typedef typename elem_type::pos_type type;
     };
 

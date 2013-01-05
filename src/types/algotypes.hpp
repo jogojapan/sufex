@@ -27,7 +27,7 @@ namespace rlx {
 
     template <typename Container>
     struct char_vec
-    { typedef typename rlxtype::elemtype<Container>::type c; };
+    { typedef rlxtype::elemtype<Container> c; };
 
     template <typename It>
     struct char_it
@@ -36,7 +36,7 @@ namespace rlx {
     template <typename Container>
     struct ngram_vec
     {
-      typedef typename rlxtype::elemtype<Container>::type elem;
+      typedef rlxtype::elemtype<Container> elem;
 
       typedef ngram<elem> etype;
       typedef typename etype::c   c;

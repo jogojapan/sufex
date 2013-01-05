@@ -36,8 +36,15 @@ namespace rlxtype {
    * which returns an iterator.
    */
   template <typename T>
-  struct elemtype
-  { typedef typename std::remove_reference<decltype(*(std::declval<T>().begin()))>::type type; };
+  using elemtype = typename std::remove_reference<decltype(*(std::declval<T>().begin()))>::type;
+
+  /**
+   * Use this to compute, at compile time, the iterator type of the given
+   * container type T. This assumes that T implements a function begin(),
+   * which returns an iterator.
+   */
+  template <typename T>
+  using itertype = typename std::remove_reference<decltype(std::declval<T>().begin())>::type;
 
   /**
    * Use this to check, at compile time, whether an assignment `T1 = T2;`
