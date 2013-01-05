@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_lexicographical_renaming_skew)
   auto trigrams =
       maker::make_23trigrams(text.begin(),text.end());
 
-  sux::sort_23trigrams<sux::AlphabetClass::sparse>(trigrams,1);
+  sux::sort_23trigrams<rlx::AlphabetClass::sparse>(trigrams,1);
 
   std::vector<pos_type> expected
   { 33 , 48 , 38 , 2 , 46 , 30 , 23 , 45 , 40 , 8 , 6 , 34 , 32 , 23 , 53 , 49 , 8 , 28 ,

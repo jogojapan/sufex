@@ -68,14 +68,14 @@ namespace rlx {
     template <typename Compare, typename It1, typename It2>
     constexpr bool is_comparator()
     {
+      using std::decay;
       using std::is_same;
       using std::is_integral;
       using rlxtype::deref;
       typedef rlxtype::function_traits<Compare> traits;
       typedef typename traits::result_type      result;
-      typedef typename traits::arg<0>::type     arg0;
-      typedef typename traits::arg<1>::type     arg1;
-      template <typename T> using decay = typename std::decay<T>::type;
+      typedef typename traits::template arg<0>::type     arg0;
+      typedef typename traits::template arg<1>::type     arg1;
 
       return (traits::arity == 2
           && is_integral<result>::value
@@ -119,7 +119,7 @@ namespace rlx {
      * Perform one pass of radix sort for trigrams, using the specified number
      * of parallel threads.
      */
-    template <AlphabetClass alphaclass, typename It, typename Extractor>
+    template <AlphabetClass alphaclass, typename Pos = std::size_t, typename It = char*, typename Extractor = char(char*)>
     static void bucket_sort
     (It from, It to, It dest, Extractor extractor,
         const rlxutil::parallel::portions &portions)
@@ -131,9 +131,12 @@ namespace rlx {
       using namespace rlx::alphabet_tools;
       using rlxutil::parallel::tools::arg_generator;
       using rlxutil::parallel::tools::wait_for;
+      using rlxtype::function_traits;
 
-      typedef deref<It>                            elem_type;
-      typedef typename alphaclass::freq_table_type freq_table_type;
+      typedef deref<It>                                          elem_type;
+      typedef typename function_traits<Extractor>::result_type   char_type;
+      typedef Alphabet<alphaclass,char_type,Pos>                 alphabet_type;
+      typedef typename alphabet_type::freq_table_type            freq_table_type;
 
       /* Create a frequency list of characters. */
       auto frqtab_vec = portions.apply
@@ -175,7 +178,7 @@ namespace rlx {
 
       /* Radix-sorting threads. */
       auto sort_fut_vec = portions.apply_dynargs
-          (from,to,base::bucket_sort<It,It,Extractor,freq_table_type>,
+          (from,to,seqalgo::bucket_sort<It,It,Extractor,freq_table_type>,
            arg_generator(
                [&cumul_frqtab_vec,dest,&extractor](int thread)
            { return make_tuple(dest,extractor,ref(cumul_frqtab_vec[thread])); })

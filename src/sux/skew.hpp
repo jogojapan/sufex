@@ -28,7 +28,7 @@ namespace rlxalgo {
   namespace skew {
 
     template <typename T>     using noref    = typename std::remove_reference<T>::type;
-    template <typename... Ts> using sequence = std::vector;
+    template <typename... Ts> using sequence = std::vector<Ts...>;
 
     /**
      * Computes the center point for a given input sequence. It's right
@@ -93,7 +93,7 @@ namespace rlxalgo {
     };
 
     template <sux::TGImpl tgimpl, typename It, typename LexIt>
-    typename sequence<S1TrigramImpl<tgimpl,rlxtype::deref<It>,rlxtype::deref<LexIt>>>
+    sequence<S1TrigramImpl<tgimpl,rlxtype::deref<It>,rlxtype::deref<LexIt>>>
     make_s1_trigrams(It from, It to, LexIt lex_from, LexIt lex_to, unsigned threads)
     {
       using namespace rlx::algotypes;
@@ -198,7 +198,7 @@ namespace rlxalgo {
           throw std::out_of_range("Attempt to use a position type with make_suffix_array that "
               "is not large enough for the given input string");
 
-      using sux::AlphabetClass;
+      using rlx::AlphabetClass;
       using lex       = lexicographical_renaming;
       using recursion = lex::recursion;
 
@@ -270,16 +270,19 @@ namespace rlxalgo {
                       ((size_t)distance(begin(rec_text),end(rec_text)));
 
                       auto rec_s23 = move(get<1>(workpile.top()));
+                      typedef rlxtype::elemtype<decltype(rec_s23)> s23_elem_type;
+                      typedef rlxtype::elemtype<decltype(s1)>      s1_elem_type;
                       /* Center of the renamed lexicographical names array. */
                       const Pos center = rec_lex.size() / 2 + (rec_lex.size() % 2 == 1 ? 1 : 0);
                       /* Merge the S1 and the S23 array. */
                       rlx::seqalgo::merge_sorted(
-                          begin(rec_23),end(rec_23),begin(s1),end(s1),begin(sux_array),
-                          [](const rlx::elemtype<rec_s23> &lhs, const rlx::elemtype<s1> &rhs)
+                          begin(rec_s23),end(rec_s23),begin(s1),end(s1),begin(sux_array),
+                          [center,&rec_lex,&rec_text]
+                           (const s23_elem_type &lhs, const s1_elem_type &rhs)
                           {
                             if (triget1(lhs) < rhs._ch)
                               return true;
-                            if (triget1(lhs) == rhs._ch)
+                            if (triget1(lhs) == rhs._ch) {
                               if (pos_of(lhs) % 3 == 1)
                                 {
                                   Pos lhs_lex = rec_lex[center + pos_of(lhs)/3];
@@ -296,6 +299,7 @@ namespace rlxalgo {
                                   Pos rhs_lex = rec_lex[center + rhs._pos/3];
                                   return (lhs_lex < rhs_lex);
                                 }
+                            }
                           });
 
                       /* Take the current work item off the pile; it's done. */
@@ -312,7 +316,7 @@ namespace rlxalgo {
 
                           typedef itertype<decltype(sux_array)> suxit;
                           portions.apply(begin(sux_array),end(sux_array),
-                              [](suxit suxfrom, suxit suxtom, suxit suxbeg)
+                              [&rec_lex](suxit suxfrom, suxit suxto, suxit suxbeg)
                               {
                                 while (suxfrom != suxto) {
                                   rec_lex[*suxfrom] = distance(suxbeg,suxfrom);
@@ -346,32 +350,36 @@ namespace rlxalgo {
           sequence<Pos> sux_array
           ((size_t)distance(from,to));
 
+          typedef rlxtype::elemtype<decltype(trigrams)> s23_elem_type;
+          typedef rlxtype::elemtype<decltype(s1)>       s1_elem_type;
+
           /* Center of the renamed lexicographical names array. */
           const Pos center = inv_sux.size() / 2 + (inv_sux.size() % 2 == 1 ? 1 : 0);
           /* Merge the S1 and the S23 array. */
           rlx::seqalgo::merge_sorted(
               begin(trigrams),end(trigrams),begin(s1),end(s1),begin(sux_array),
-              [](const rlx::elemtype<trigrams> &lhs, const rlx::elemtype<s1> &rhs)
+              [center,&inv_sux,&trigrams](const s23_elem_type &lhs, const s1_elem_type &rhs)
               {
                 if (triget1(lhs) < rhs._ch)
                   return true;
-                if (triget1(lhs) == rhs._ch)
+                if (triget1(lhs) == rhs._ch) {
                   if (pos_of(lhs) % 3 == 1)
                     {
-                      Pos lhs_lex = rec_lex[center + pos_of(lhs)/3];
+                      Pos lhs_lex = inv_sux[center + pos_of(lhs)/3];
                       Pos rhs_lex = rhs._renamed_s1;
                       return (lhs_lex < rhs_lex);
                     }
                   else
                     {
                       Pos lhs_ch = triget2(lhs);
-                      Pos rhs_ch = rec_text[rhs._pos + 1];
+                      Pos rhs_ch = trigrams[rhs._pos + 1];
                       if (lhs_ch < rhs_ch)
                         return true;
-                      Pos lhs_lex = rec_lex[pos_of(lhs)/3 + 1];
-                      Pos rhs_lex = rec_lex[center + rhs._pos/3];
+                      Pos lhs_lex = inv_sux[pos_of(lhs)/3 + 1];
+                      Pos rhs_lex = inv_sux[center + rhs._pos/3];
                       return (lhs_lex < rhs_lex);
                     }
+                }
               });
 
           result = move(sux_array);

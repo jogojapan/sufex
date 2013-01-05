@@ -126,8 +126,8 @@ BOOST_AUTO_TEST_CASE(sux_builder_trigram_test_8)
 
 BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
 {
-  using sux::Alphabet;
-  using sux::AlphabetClass;
+  using rlx::Alphabet;
+  using rlx::AlphabetClass;
   const std::basic_string<Char> input { (const Char *)"abcabbbbcc" };
 
   typedef Alphabet<AlphabetClass::sparse,Char,Pos>::char_freq_type  freq_type;
@@ -138,7 +138,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
     { 'c',7 }
   };
 
-  auto actual = sux::alphabet_tools::make_freq_table<table_type>(
+  auto actual = rlx::alphabet_tools::make_freq_table<table_type>(
       begin(input),end(input),sux::cid<Char>);
   Alphabet<AlphabetClass::sparse,Char,Pos>::make_cumulative(actual);
   BOOST_CHECK(actual.size() == 3);
@@ -163,7 +163,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
 
   auto actual = SAMaker::make_23trigrams(begin(input),end(input));
 
-  SSorter::AlphabetSpecific<sux::AlphabetClass::sparse>::sort_23trigrams(actual,1);
+  SSorter::AlphabetSpecific<rlx::AlphabetClass::sparse>::sort_23trigrams(actual,1);
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -181,7 +181,7 @@ void perform_multi_threaded_trigram_sorting()
       << " trigram implementation";
 
   using sux::sort_23trigrams;
-  using sux::AlphabetClass;
+  using rlx::AlphabetClass;
 
   /* Prepare for precise time measurements. */
   typedef std::chrono::duration<double,std::milli> MS;

@@ -32,18 +32,18 @@ BOOST_AUTO_TEST_CASE(sux_builder_skew_make_s0_test)
   auto trigrams =
       maker::make_23trigrams(text.begin(),text.end());
 
-  sux::sort_23trigrams<sux::AlphabetClass::sparse>(trigrams,1);
+  sux::sort_23trigrams<rlx::AlphabetClass::sparse>(trigrams,1);
 
   const std::size_t center
   { (trigrams.size() / 2) + (trigrams.size() % 2) };
 
   auto renamed =
-      rlxalgo::skew::rename_lexicographically(text,trigrams,center,1);
+      rlxalgo::skew::rename_lexicographically(begin(text),trigrams,center,1);
   auto &name_str =
       rlxalgo::lexicographical_renaming::newstring_of(renamed);
 
   auto s0_trigrams =
-      rlxalgo::skew::make_s0_trigrams<sux::TGImpl::structure>(
+      rlxalgo::skew::make_s1_trigrams<sux::TGImpl::structure>(
           text.begin(),text.end(),
           name_str.begin(),name_str.end(),
           1);

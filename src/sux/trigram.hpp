@@ -364,17 +364,17 @@ namespace sux {
       }
     }
 
-    template<AlphabetClass alphabetclass = AlphabetClass::sparse>
+    template<rlx::AlphabetClass alphabetclass = rlx::AlphabetClass::sparse>
     struct AlphabetSpecific;
 
   };
 
   template <typename Char, typename Pos>
-  template <AlphabetClass alphaclass>
+  template <rlx::AlphabetClass alphaclass>
   struct TrigramSorter<Char,Pos>::AlphabetSpecific
   {
     typedef TrigramSorter<Char,Pos>                   base;
-    typedef Alphabet<alphaclass,Char,Pos>             alphabet_type;
+    typedef rlx::Alphabet<alphaclass,Char,Pos>        alphabet_type;
     typedef typename alphabet_type::freq_table_type   freq_table_type;
 
     /**
@@ -436,12 +436,10 @@ namespace sux {
 
       /* Radix-sorting threads. */
       auto sort_fut_vec = portions.apply_dynargs
-          (from,to,base::bucket_sort<It,Extractor,elem_type>,
+          (from,to,base::bucket_sort<It,Extractor>,
            arg_generator(
                [&cumul_frqtab_vec,dest,&extractor](int thread)
-           {
-              return make_tuple(extractor,ref(cumul_frqtab_vec[thread]),dest);
-           })
+               { return make_tuple(extractor,ref(cumul_frqtab_vec[thread]),dest); })
           );
 
       wait_for(sort_fut_vec);
@@ -503,7 +501,7 @@ namespace sux {
    * and same type as the given one. This wouldn't be possible if
    * only iterators were available.
    */
-  template <AlphabetClass alphaclass, typename Vector>
+  template <rlx::AlphabetClass alphaclass, typename Vector>
   void sort_23trigrams(Vector &trigrams, unsigned num_threads)
   {
     typedef Vector vec_type;
