@@ -32,7 +32,10 @@ BOOST_AUTO_TEST_CASE(sux_builder_skew_make_s0_test)
   auto trigrams =
       maker::make_23trigrams(text.begin(),text.end());
 
-  sux::sort_23trigrams<rlx::AlphabetClass::sparse>(trigrams,1);
+  rlx::Alphabet<rlx::AlphabetClass::sparse,char,pos_type> alphabet
+  { };
+
+  sux::sort_23trigrams(trigrams,alphabet,1);
 
   const std::size_t center
   { (trigrams.size() / 2) + (trigrams.size() % 2) };

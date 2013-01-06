@@ -199,13 +199,16 @@ namespace rlxalgo {
               "is not large enough for the given input string");
 
       using rlx::AlphabetClass;
+      using rlx::Alphabet;
       using lex       = lexicographical_renaming;
       using recursion = lex::recursion;
 
       /* Extract 2,3-trigrams. */
       auto trigrams = sux::extract_23trigrams<Pos>(from,to);
       /* Sort them. */
-      sux::sort_23trigrams<AlphabetClass::sparse>(trigrams,threads);
+      Alphabet<AlphabetClass::sparse,chtype<inp>,Pos> alphabet
+      { };
+      sux::sort_23trigrams(trigrams,alphabet,threads);
       /* Generate an integer alphabet for them according to
        * their sorting order. */
       auto renamed_trigrams = rename_lexicographically(
@@ -230,9 +233,15 @@ namespace rlxalgo {
         {
           auto renamed_string =
               lex::move_newstring_from(renamed_trigrams);
+          auto alphabet_size  =
+              lex::alphsize(renamed_trigrams);
           auto renamed_trigrams =
               sux::extract_23trigrams<Pos>(renamed_string.begin(),renamed_string.end());
-          sux::sort_23trigrams<AlphabetClass::zero_range>(renamed_trigrams,threads);
+
+          Alphabet<AlphabetClass::zero_range,Pos,Pos> alphabet
+          { alphabet_size };
+
+          sux::sort_23trigrams(renamed_trigrams,alphabet,threads);
 
           stack<pair<noref<decltype(renamed_string)>,noref<decltype(renamed_trigrams)>>>
           workpile
@@ -248,10 +257,14 @@ namespace rlxalgo {
               if (lex::is<recursion::needed>(rec_renamed))
                 {
                   /* Recursion. */
-                  auto rec_text = lex::move_newstring_from(rec_renamed);
+                  auto rec_text     = lex::move_newstring_from(rec_renamed);
+                  auto rec_alphsize =
+                      lex::alphsize(rec_renamed);
                   auto rec_trigrams =
                       sux::extract_23trigrams<Pos>(rec_text.begin(),rec_text.end());
-                  sux::sort_23trigrams<AlphabetClass::zero_range>(rec_trigrams,threads);
+                  Alphabet<AlphabetClass::zero_range,Pos,Pos> rec_alphabet
+                  { rec_alphsize };
+                  sux::sort_23trigrams(rec_trigrams,rec_alphsize,threads);
                   workpile.emplace(move(rec_text),move(rec_trigrams));
                 }
               else

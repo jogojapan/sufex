@@ -23,23 +23,6 @@ namespace rlx {
   template <AlphabetClass alphabetclass, typename Char = char, typename Freq = std::size_t>
   struct Alphabet;
 
-  namespace alphabet_tools {
-    /**
-     * Generate frequency table for the text span [from,to). Use the given
-     * extractor to extract a symbol at each iterator position.
-     */
-    template <typename FreqTable, typename Iterator, typename CharExtractor>
-    static FreqTable make_freq_table(Iterator from, Iterator to, CharExtractor extractor)
-    {
-      FreqTable freq_table
-      { };
-      std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
-        ++freq_table[extractor(elem)];
-      });
-      return freq_table;
-    }
-  }
-
   template <typename Char, typename Freq>
   struct Alphabet<AlphabetClass::sparse,Char,Freq>
   {
@@ -47,6 +30,12 @@ namespace rlx {
     typedef Freq                 freq_type;
     typedef std::pair<Char,Freq> char_freq_type;
     typedef std::map<Char,Freq>  freq_table_type;
+
+    /**
+     * Create a new frequency table with all character counts set to 0.
+     */
+    freq_table_type new_freq_table() const
+    { return {}; }
 
     /**
      * Adding the character frequencies of the second frequency
@@ -96,6 +85,12 @@ namespace rlx {
     typedef std::vector<Freq>  freq_table_type;
 
     /**
+     * Create a new frequency table with all character counts set to 0.
+     */
+    freq_table_type new_freq_table() const
+    { return freq_table_type(static_cast<std::size_t>(_highest)); }
+
+    /**
      * Adding the character frequencies of the second frequency
      * table to those of the first. If the alphabet is very large,
      * the operation will be parallelised.
@@ -143,6 +138,23 @@ namespace rlx {
       }
     }
   };
+
+  namespace alphabet_tools {
+    /**
+     * Generate frequency table for the text span [from,to). Use the given
+     * extractor to extract a symbol at each iterator position.
+     */
+    template <typename It, typename CharExtractor, typename AlphabetType>
+    static typename AlphabetType::freq_table_type
+    make_freq_table(It from, It to, CharExtractor extractor, const AlphabetType &alphabet)
+    {
+      auto freq_table = alphabet.new_freq_table();
+      std::for_each(from,to,[&freq_table,&extractor](decltype(*from) &elem) {
+        ++freq_table[extractor(elem)];
+      });
+      return freq_table;
+    }
+  }
 
 }
 

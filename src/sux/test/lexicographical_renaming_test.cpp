@@ -69,9 +69,7 @@ BOOST_AUTO_TEST_CASE(sux_builder_lexicographical_renaming)
   { lex::move_newstring_from(results) };
 
   for (const auto &elem : renamed_vec)
-    {
-      std::cout << elem << ',';
-    }
+    std::cout << elem << ',';
   std::cout << std::endl;
 
   BOOST_CHECK(equal(begin(expected),end(expected),begin(renamed_vec)));
@@ -92,7 +90,9 @@ BOOST_AUTO_TEST_CASE(sux_builder_lexicographical_renaming_skew)
   auto trigrams =
       maker::make_23trigrams(text.begin(),text.end());
 
-  sux::sort_23trigrams<rlx::AlphabetClass::sparse>(trigrams,1);
+  rlx::Alphabet<rlx::AlphabetClass::sparse,char,pos_type> alphabet
+  { };
+  sux::sort_23trigrams(trigrams,alphabet,1);
 
   std::vector<pos_type> expected
   { 33 , 48 , 38 , 2 , 46 , 30 , 23 , 45 , 40 , 8 , 6 , 34 , 32 , 23 , 53 , 49 , 8 , 28 ,

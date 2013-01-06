@@ -11,6 +11,7 @@
 #include <utility>
 #include "../util/more_type_traits.hpp"
 #include "../util/more_algorithm.hpp"
+#include "../types/algotypes.hpp"
 
 namespace rlxalgo {
 
@@ -43,7 +44,8 @@ namespace rlxalgo {
      */
     template <typename It, typename DestIt,
               typename Posmap = decltype(std_posmap<typename deref<It>::pos_type>)>
-    static recursion apply(
+    static std::pair<recursion,typename deref<It>::pos_type>
+    apply(
         It                           start,
         It                           end,
         rlxutil::parallel::portions &portions,
@@ -169,7 +171,10 @@ namespace rlxalgo {
        * lexicographical names were unique, and vec is the vector with
        * the new names. */
       pos_type original_size = distance(start,end);
-      return (total_names == original_size) ? recursion::unneeded : recursion::needed;
+      if (total_names == original_size)
+        return { recursion::unneeded , total_names };
+      else
+        return { recursion::needed , total_names };
     }
 
     /**
@@ -179,6 +184,11 @@ namespace rlxalgo {
      * container for lexicographical renaming to have.
      */
     template <typename InputVector>
+    using inpelem = rlx::algotypes::ngram_vec<InputVector>;
+    template <typename InputVector>
+    using postype = rlx::algotypes::postype<inpelem<InputVector>>;
+
+    template <typename InputVector>
     struct std_dest_element
     {
       typedef rlxtype::deref<decltype(std::declval<InputVector>().begin())> elem_type;
@@ -187,7 +197,7 @@ namespace rlxalgo {
 
     template <typename InpVector>
     using result_type =
-        std::pair<recursion,std::vector<typename std_dest_element<InpVector>::type>>;
+        std::tuple<recursion,postype<InpVector>,std::vector<postype<InpVector>>>;
 
     /**
      * The `apply()` function returns a result that includes information
@@ -197,9 +207,18 @@ namespace rlxalgo {
      *
      *     is<recusion::needed>(result)
      */
-    template <recursion val, typename OutVector>
-    static bool is(const std::pair<recursion,OutVector> &result)
-    { return (result.first == val); }
+    template <recursion val, typename... Other>
+    static bool is(const std::tuple<recursion,Other...> &result)
+    { return (std::get<0>(result) == val); }
+
+    /**
+     * Access to the size of the alphabet (i.e. the number of distinct
+     * lexicographical names created).
+     */
+    template <typename Pos, typename OutVector>
+    static const Pos &alphsize(
+        const std::tuple<recursion,Pos,OutVector> &result)
+    { return std::get<1>(result); }
 
     /**
      * Extract the new (lexicographically renamed) string (i.e.,
@@ -211,25 +230,25 @@ namespace rlxalgo {
      *     auto result = lexicographical_renaming<...>.apply();
      *     parallel_vector<...> vec = move_newstring_from(result);
      */
-    template <typename OutVector>
+    template <typename Pos, typename OutVector>
     static typename std::remove_reference<OutVector>::type &&
-    move_newstring_from(std::pair<recursion,OutVector> &result)
-    { return std::move(result.second); }
+    move_newstring_from(std::tuple<recursion,Pos,OutVector> &result)
+    { return std::move(std::get<2>(result)); }
 
     /**
      * Access to the new (lexicographically renamed) string.
      */
-    template <typename OutVector>
+    template <typename Pos, typename OutVector>
     static const OutVector &newstring_of(
-        const std::pair<recursion,OutVector> &result)
-    { return result.second; }
+        const std::tuple<recursion,Pos,OutVector> &result)
+    { return std::get<2>(result); }
 
     /**
      * Access to the new (lexicographically renamed) string.
      */
-    template <typename OutVector>
-    static OutVector &newstring_of(std::pair<recursion,OutVector> &result)
-    { return result.second; }
+    template <typename Pos, typename OutVector>
+    static OutVector &newstring_of(std::tuple<recursion,Pos,OutVector> &result)
+    { return std::get<2>(result); }
 
     /**
      * Perform lexicographical renaming on a lexicographically sorted vector
@@ -264,13 +283,16 @@ namespace rlxalgo {
         Posmap                      &&posmap = std_posmap<typename elem_type<InpVector>::pos_type>,
         typename std::enable_if<is_posmap<Posmap>::value,int>::type = 0)
     {
+      using std::pair;
       using std::forward;
+      using recursion = lexicographical_renaming::recursion;
+
       typedef typename std_dest_element<InpVector>::type pos_type;
       std::vector<pos_type> dest_vec(trigrams.size());
-      lexicographical_renaming::recursion flag = apply(
+      pair<recursion,pos_type> result = apply(
           trigrams.begin(),trigrams.end(),portions,dest_vec.begin(),dest_vec.end(),
           eq,forward<Posmap>(posmap));
-      return { flag , std::move(dest_vec) };
+      return result_type<InpVector> { result.first , result.second , std::move(dest_vec) };
     }
 
   };

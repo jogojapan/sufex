@@ -130,17 +130,21 @@ BOOST_AUTO_TEST_CASE(sux_builder_chardistribution_test)
   using rlx::AlphabetClass;
   const std::basic_string<Char> input { (const Char *)"abcabbbbcc" };
 
-  typedef Alphabet<AlphabetClass::sparse,Char,Pos>::char_freq_type  freq_type;
-  typedef Alphabet<AlphabetClass::sparse,Char,Pos>::freq_table_type table_type;
+  typedef Alphabet<AlphabetClass::sparse,Char,Pos> alphabet_type;
+  typedef typename alphabet_type::char_freq_type   freq_type;
+  typedef typename alphabet_type::freq_table_type  table_type;
   table_type expected {
     { 'a',0 },
     { 'b',2 },
     { 'c',7 }
   };
 
-  auto actual = rlx::alphabet_tools::make_freq_table<table_type>(
-      begin(input),end(input),sux::cid<Char>);
-  Alphabet<AlphabetClass::sparse,Char,Pos>::make_cumulative(actual);
+  alphabet_type alphabet
+  { };
+
+  auto actual = rlx::alphabet_tools::make_freq_table(
+      begin(input),end(input),sux::cid<Char>,alphabet);
+  alphabet_type::make_cumulative(actual);
   BOOST_CHECK(actual.size() == 3);
   BOOST_CHECK(equal(begin(actual),end(actual),begin(expected),
       [](const freq_type &f1, const freq_type &f2){
@@ -163,7 +167,10 @@ BOOST_AUTO_TEST_CASE(sux_builder_sort_23trigrams_test1)
 
   auto actual = SAMaker::make_23trigrams(begin(input),end(input));
 
-  SSorter::AlphabetSpecific<rlx::AlphabetClass::sparse>::sort_23trigrams(actual,1);
+  rlx::Alphabet<rlx::AlphabetClass::sparse,Char,Pos> alphabet
+  { };
+
+  SSorter::sort_23trigrams(actual,alphabet,1);
   BOOST_CHECK((actual.size() == expected.size()
       && (equal(begin(actual),end(actual),begin(expected)))));
 }
@@ -181,6 +188,7 @@ void perform_multi_threaded_trigram_sorting()
       << " trigram implementation";
 
   using sux::sort_23trigrams;
+  using rlx::Alphabet;
   using rlx::AlphabetClass;
 
   /* Prepare for precise time measurements. */
@@ -204,7 +212,9 @@ void perform_multi_threaded_trigram_sorting()
 
   /* Trigam sort. */
   auto tp1 = rlxutil::combined_clock<std::micro>::now();
-  sort_23trigrams<AlphabetClass::sparse>(actual,4);
+  Alphabet<AlphabetClass::sparse,Char,LPos> alphabet
+  { };
+  sort_23trigrams(actual,alphabet,4);
   auto tp2 = rlxutil::combined_clock<std::micro>::now();
   /* Alternative trigram sort, as reference. */
   auto tp3 = rlxutil::combined_clock<std::micro>::now();

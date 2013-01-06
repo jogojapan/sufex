@@ -364,26 +364,14 @@ namespace sux {
       }
     }
 
-    template<rlx::AlphabetClass alphabetclass = rlx::AlphabetClass::sparse>
-    struct AlphabetSpecific;
-
-  };
-
-  template <typename Char, typename Pos>
-  template <rlx::AlphabetClass alphaclass>
-  struct TrigramSorter<Char,Pos>::AlphabetSpecific
-  {
-    typedef TrigramSorter<Char,Pos>                   base;
-    typedef rlx::Alphabet<alphaclass,Char,Pos>        alphabet_type;
-    typedef typename alphabet_type::freq_table_type   freq_table_type;
-
     /**
      * Perform one pass of radix sort for trigrams, using the specified number
      * of parallel threads.
      */
-    template <typename It, typename Extractor>
+    template <typename It, typename Extractor, typename AlphabetType>
     static void parallel_bucket_sort
     (It from, It to, It dest, Extractor extractor,
+        const AlphabetType &alphabet,
         const rlxutil::parallel::portions &portions)
     {
       using std::ref;
@@ -394,11 +382,13 @@ namespace sux {
       using rlxutil::parallel::tools::arg_generator;
       using rlxutil::parallel::tools::wait_for;
 
-      typedef deref<It> elem_type;
+      typedef deref<It>                              elem_type;
+      typedef typename AlphabetType::freq_table_type freq_table_type;
 
       /* Create a frequency list of characters. */
       auto frqtab_vec = portions.apply
-          (from,to,make_freq_table<freq_table_type,It,Extractor>,extractor);
+          (from,to,make_freq_table<It,Extractor,AlphabetType>,
+              extractor,alphabet);
 
       /* Initialise cumulative frequencies per thread. This will
        * be filled with the correct values later. */
@@ -415,7 +405,7 @@ namespace sux {
         freq_table_type frqtab
         { frqtab_fut.get() };
         /* Add its character frequencies to the total table. */
-        alphabet_type::add_char_freq_table(cumul_frqtab,frqtab,portions.num());
+        AlphabetType::add_char_freq_table(cumul_frqtab,frqtab,portions.num());
         /* Move thread-local frequency table to the end of the
          * thread-local cumulative frequency table list. Note
          * that the frequencies are not really cumulative yet;
@@ -424,19 +414,19 @@ namespace sux {
       }
 
       /* Cumulate the entries of the global frequency table. */
-      alphabet_type::make_cumulative(cumul_frqtab);
+      AlphabetType::make_cumulative(cumul_frqtab);
 
       /* Correct the cumulative thread-local frequencies. */
       for (freq_table_type &frqtab : cumul_frqtab_vec) {
         /* Swap with current version of global cumulative
          * frequency table. */
         std::swap(cumul_frqtab,frqtab);
-        alphabet_type::add_char_freq_table(cumul_frqtab,frqtab,portions.num());
+        AlphabetType::add_char_freq_table(cumul_frqtab,frqtab,portions.num());
       }
 
       /* Radix-sorting threads. */
       auto sort_fut_vec = portions.apply_dynargs
-          (from,to,base::bucket_sort<It,Extractor>,
+          (from,to,bucket_sort<It,Extractor>,
            arg_generator(
                [&cumul_frqtab_vec,dest,&extractor](int thread)
                { return make_tuple(extractor,ref(cumul_frqtab_vec[thread]),dest); })
@@ -445,8 +435,9 @@ namespace sux {
       wait_for(sort_fut_vec);
     }
 
-    template <typename TrigramType>
-    static void sort_23trigrams(std::vector<TrigramType> &trigrams, unsigned num_threads)
+    template <typename TrigramType, typename AlphabetType>
+    static void sort_23trigrams(
+        std::vector<TrigramType> &trigrams, const AlphabetType &alphabet, unsigned num_threads)
     {
       /* Portions for threads. */
       rlxutil::parallel::portions portions
@@ -454,15 +445,19 @@ namespace sux {
       /* Vector for intermediate results. */
       std::vector<TrigramType> temp_vec(trigrams.size());
       /* First pass. */
-      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),triget3<TrigramType>,portions);
+      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),
+          triget3<TrigramType>,alphabet,portions);
       swap(trigrams,temp_vec);
       /* Second pass. */
-      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),triget2<TrigramType>,portions);
+      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),
+          triget2<TrigramType>,alphabet,portions);
       swap(trigrams,temp_vec);
       /* Third pass. */
-      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),triget1<TrigramType>,portions);
+      parallel_bucket_sort(begin(trigrams),end(trigrams),begin(temp_vec),
+          triget1<TrigramType>,alphabet,portions);
       swap(trigrams,temp_vec);
     }
+
   };
 
   /**
@@ -501,16 +496,16 @@ namespace sux {
    * and same type as the given one. This wouldn't be possible if
    * only iterators were available.
    */
-  template <rlx::AlphabetClass alphaclass, typename Vector>
-  void sort_23trigrams(Vector &trigrams, unsigned num_threads)
+  template <typename Vector, typename AlphabetType>
+  void sort_23trigrams(
+      Vector &trigrams, const AlphabetType &alphabet, unsigned num_threads)
   {
     typedef Vector vec_type;
     typedef typename vec_type::value_type     trigram_type;
     typedef typename trigram_type::char_type  char_type;
     typedef typename trigram_type::pos_type   pos_type;
 
-    TrigramSorter<char_type,pos_type>::template AlphabetSpecific<alphaclass>::sort_23trigrams(
-        trigrams,num_threads);
+    TrigramSorter<char_type,pos_type>::sort_23trigrams(trigrams,alphabet,num_threads);
   }
 
 }
