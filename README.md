@@ -29,22 +29,20 @@ template arguments:
  * The character type (e.g. `char`)
  * The position type (e.g. `unsigned long`)
 
-{% codeblock Trigram generation lang:cpp %}
-#include <sux/trigram.hpp>
-
-using namespace std;
-using namespace sux;
-string input { "abcabeabxd" };
-
-/* Generating trigrams. */
-auto trigrams =
-    TrigramMaker<TGImpl::tuple,string::value_type,size_t>::make_23trigrams(begin(input),end(input));
-
-/* Printing them. */
-for (const auto &trigram : trigrams)
-  cout << triget1(trigram) << triget2(trigram) << triget3(trigram) << '\n';
-cout.flush();
-{% endcodeblock lang:cpp %}
+    #include <sux/trigram.hpp>
+    
+    using namespace std;
+    using namespace sux;
+    string input { "abcabeabxd" };
+    
+    /* Generating trigrams. */
+    auto trigrams =
+        TrigramMaker<TGImpl::tuple,string::value_type,size_t>::make_23trigrams(begin(input),end(input));
+    
+    /* Printing them. */
+    for (const auto &trigram : trigrams)
+      cout << triget1(trigram) << triget2(trigram) << triget3(trigram) << '\n';
+    cout.flush();
 
 The code above makes use of the functions `triget1`, `triget2` and
 `triget3` to access the individual characters belonging to a trigram.
@@ -54,13 +52,11 @@ which can be applied to any instance of `std::basic_string<CharType>`.
 
 ### Trigram sorting
 
-{% codeblock Trigram sorting lang:cpp %}
-/* Input. */
-string input { "abcabeabxd" };
-
-/* 2,3-Trigrams (convenience function). */
-auto trigrams = string_to_23trigrams(input);
-
-/* Trigram sorting using 2 parallel threads. */
-sort_23trigrams(trigrams,2);
-{% endcodeblock lang:cpp %}
+    /* Input. */
+    string input { "abcabeabxd" };
+    
+    /* 2,3-Trigrams (convenience function). */
+    auto trigrams = string_to_23trigrams(input);
+    
+    /* Trigram sorting using 2 parallel threads. */
+    sort_23trigrams(trigrams,2);
