@@ -29,6 +29,8 @@ template arguments:
  * The character type (e.g. `char`)
  * The position type (e.g. `unsigned long`)
 
+Here is a piece of code that shows how to use this:
+
     #include <sux/trigram.hpp>
     
     using namespace std;
