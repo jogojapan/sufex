@@ -17,7 +17,7 @@ configure_file (
 # Removed -Wshadow from the below to avoid a deluge of warnings from
 # Boost.
 # Disable debug mode: -DNDEBUG
-ADD_DEFINITIONS(-std=c++11 -g -O3 -pthread -Wall -W -Wpointer-arith -Wcast-qual -Wcast-align -D_GLIBCXX_USE_NANOSLEEP)
+ADD_DEFINITIONS(-std=c++11 -g -O3 -pthread -Wall -W -Wpointer-arith -Wcast-qual -Wcast-align -Wno-unused-local-typedefs -D_GLIBCXX_USE_NANOSLEEP)
 
 include_directories("${PROJECT_BINARY_DIR}")
 

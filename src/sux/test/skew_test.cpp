@@ -71,4 +71,18 @@ BOOST_AUTO_TEST_CASE(sux_builder_skew_make_s0_test)
   BOOST_CHECK(equal(begin(expected),end(expected),begin(s0_trigrams)));
 }
 
+BOOST_AUTO_TEST_CASE(sux_builder_skew_test1)
+{
+  using sux::trigram_tools::to_str;
+  using sux::trigram_tools::pos_of;
 
+  typedef unsigned short pos_type;
+
+  std::string text
+  { "abxabcdabxfg" };
+
+  auto suffix_array =
+      rlxalgo::skew::make_suffix_array<pos_type>(text.begin(),text.end(),1);
+
+
+}

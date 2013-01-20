@@ -44,7 +44,7 @@ namespace rlxalgo {
 
     template <typename Sequence>
     constexpr std::size_t center_of(Sequence seq)
-    { return center_if(seq.begin(),seq.end()); }
+    { return center_of(seq.begin(),seq.end()); }
 
     template <typename TextIt, typename InpVector>
     lexicographical_renaming::result_type<InpVector> rename_lexicographically(
@@ -189,7 +189,7 @@ namespace rlxalgo {
       using std::distance;
 
       using namespace rlx::algotypes;
-      typedef typename char_it<It>::type inp;
+      typedef char_it<It> inp;
 
       static_assert(is_integral<Pos>::value,
           "The position type used for make_suffix_array must be an integral type.");
@@ -212,7 +212,7 @@ namespace rlxalgo {
       /* Generate an integer alphabet for them according to
        * their sorting order. */
       auto renamed_trigrams = rename_lexicographically(
-          trigrams,from,center_of(from,to),threads);
+          from,trigrams,center_of(from,to),threads);
 
       using std::size_t;
       using std::get;
@@ -253,7 +253,7 @@ namespace rlxalgo {
               auto &rec_text   = get<0>(workpile.top());
               auto center      = center_of(rec_text);
               auto rec_renamed = rename_lexicographically(
-                  get<1>(workpile.top()),begin(rec_text),center,threads);
+                  begin(rec_text),get<1>(workpile.top()),center,threads);
               if (lex::is<recursion::needed>(rec_renamed))
                 {
                   /* Recursion. */
@@ -274,7 +274,7 @@ namespace rlxalgo {
                   for (;;)
                     {
                       auto s1 =
-                          make_s1_trigrams(
+                          make_s1_trigrams<sux::TGImpl::structure>(
                               begin(rec_text),end(rec_text),begin(rec_lex),end(rec_lex),threads);
                       /* Sort S1. */
                       sort_s1_trigrams(begin(s1),end(s1),threads);
@@ -355,7 +355,7 @@ namespace rlxalgo {
           auto inv_sux = lex::move_newstring_from(renamed_trigrams);
           /* We make an S1 string. */
           auto s1 =
-              make_s1_trigrams(
+              make_s1_trigrams<sux::TGImpl::structure>(
                   from,to,begin(inv_sux),end(inv_sux),threads);
           /* Sort S1. */
           sort_s1_trigrams(begin(s1),end(s1),threads);
