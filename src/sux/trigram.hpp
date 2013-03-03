@@ -28,12 +28,6 @@
 
 namespace sux {
 
-  /** Identity function. Used as auxiliary. */
-  template<typename T>
-  inline T&        id(T &t) { return t; }
-  template <typename T>
-  inline const T& cid(const T& t) { return t; }
-
   /** Implementation of trigrams. */
   enum class TGImpl { tuple, arraytuple, structure, pointer };
 

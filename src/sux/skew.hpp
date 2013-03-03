@@ -16,6 +16,7 @@
 #include <stack>
 
 #include "../util/more_type_traits.hpp"
+#include "../util/more_algorithm.hpp"
 #include "../types/algotypes.hpp"
 #include "alphabet.hpp"
 #include "trigram.hpp"
@@ -180,6 +181,30 @@ namespace rlxalgo {
       sort_s1_trigrams(from,to,portions);
     }
 
+    template <typename It, typename Extractor = rlx::id<rlxtype::deref<It>> >
+    struct inserter
+    {
+      inserter(It it):_it(it),_ex()
+      { }
+      template <typename Ex>
+      inserter(It it, Ex &&ex):_it(it),_ex(ex)
+      { }
+      inserter &operator*()
+      { return *this; }
+      inserter &operator++()
+      { return *this; }
+      inserter &operator++(int)
+      { return *this; }
+      inserter &operator=(const rlxtype::deref<It> &val)
+      { *(_it++) = _ex(val); return *this; }
+      inserter &operator=(rlxtype::deref<It> &&val)
+      { *(_it++) = _ex(std::move(val)); return *this; }
+    private:
+      It        _it;  // internal iterator
+      Extractor _ex;  // extractor function
+    };
+
+
     template <typename Pos, typename It>
     sequence<Pos> make_suffix_array(It from, It to, unsigned threads = 4)
     {
@@ -211,7 +236,7 @@ namespace rlxalgo {
       sux::sort_23trigrams(trigrams,alphabet,threads);
       /* Generate an integer alphabet for them according to
        * their sorting order. */
-      auto renamed_trigrams = rename_lexicographically(
+      auto new_names = rename_lexicographically(
           from,trigrams,center_of(from,to),threads);
 
       using std::size_t;
@@ -229,12 +254,12 @@ namespace rlxalgo {
       /* We'll move the end result into this object: */
       sequence<Pos> result;
 
-      if (lex::is<recursion::needed>(renamed_trigrams))
+      if (lex::is<recursion::needed>(new_names))
         {
           auto renamed_string =
-              lex::move_newstring_from(renamed_trigrams);
+              lex::move_newstring_from(new_names);
           auto alphabet_size  =
-              lex::alphsize(renamed_trigrams);
+              lex::alphsize(new_names);
           auto renamed_trigrams =
               sux::extract_23trigrams<Pos>(renamed_string.begin(),renamed_string.end());
 
@@ -250,32 +275,32 @@ namespace rlxalgo {
           workpile.emplace(move(renamed_string),move(renamed_trigrams));
           while (!workpile.empty())
             {
-              auto &rec_text   = get<0>(workpile.top());
-              auto center      = center_of(rec_text);
+              auto &rec_text            = get<0>(workpile.top());
+              auto center               = center_of(rec_text);
+              auto &rec_sorted_trigrams = get<1>(workpile.top());
               auto rec_renamed = rename_lexicographically(
-                  begin(rec_text),get<1>(workpile.top()),center,threads);
+                  begin(rec_text),rec_sorted_trigrams,center,threads);
               if (lex::is<recursion::needed>(rec_renamed))
                 {
                   /* Recursion. */
-                  auto rec_text     = lex::move_newstring_from(rec_renamed);
-                  auto rec_alphsize =
-                      lex::alphsize(rec_renamed);
+                  auto new_rec_text = lex::move_newstring_from(rec_renamed);
+                  auto rec_alphsize = lex::alphsize(rec_renamed);
                   auto rec_trigrams =
-                      sux::extract_23trigrams<Pos>(rec_text.begin(),rec_text.end());
+                      sux::extract_23trigrams<Pos>(new_rec_text.begin(),new_rec_text.end());
                   Alphabet<AlphabetClass::zero_range,Pos,Pos> rec_alphabet
                   { rec_alphsize };
-                  sux::sort_23trigrams(rec_trigrams,rec_alphsize,threads);
-                  workpile.emplace(move(rec_text),move(rec_trigrams));
+                  sux::sort_23trigrams(rec_trigrams,rec_alphabet,threads);
+                  workpile.emplace(move(new_rec_text),move(rec_trigrams));
                 }
               else
                 {
-                  auto rec_lex  = lex::move_newstring_from(rec_renamed);
+                  auto rec_new_names  = lex::move_newstring_from(rec_renamed);
                   /* End of recursion. Wind up the workpile. */
                   for (;;)
                     {
                       auto s1 =
                           make_s1_trigrams<sux::TGImpl::structure>(
-                              begin(rec_text),end(rec_text),begin(rec_lex),end(rec_lex),threads);
+                              begin(rec_text),end(rec_text),begin(rec_new_names),end(rec_new_names),threads);
                       /* Sort S1. */
                       sort_s1_trigrams(begin(s1),end(s1),threads);
                       /* Merge S1 and S12 into the suffix array for rec_text. */
@@ -286,11 +311,13 @@ namespace rlxalgo {
                       typedef rlxtype::elemtype<decltype(rec_s23)> s23_elem_type;
                       typedef rlxtype::elemtype<decltype(s1)>      s1_elem_type;
                       /* Center of the renamed lexicographical names array. */
-                      const Pos center = rec_lex.size() / 2 + (rec_lex.size() % 2 == 1 ? 1 : 0);
+                      const Pos center = rec_new_names.size() / 2 + (rec_new_names.size() % 2 == 1 ? 1 : 0);
                       /* Merge the S1 and the S23 array. */
+                      /*  TODO. CONTINUE HERE. Use an 'inserter' instead of
+                       * begin(sux_array). */
                       rlx::seqalgo::merge_sorted(
                           begin(rec_s23),end(rec_s23),begin(s1),end(s1),begin(sux_array),
-                          [center,&rec_lex,&rec_text]
+                          [center,&rec_new_names,&rec_text]
                            (const s23_elem_type &lhs, const s1_elem_type &rhs)
                           {
                             if (triget1(lhs) < rhs._ch)
@@ -298,7 +325,7 @@ namespace rlxalgo {
                             if (triget1(lhs) == rhs._ch) {
                               if (pos_of(lhs) % 3 == 1)
                                 {
-                                  Pos lhs_lex = rec_lex[center + pos_of(lhs)/3];
+                                  Pos lhs_lex = rec_new_names[center + pos_of(lhs)/3];
                                   Pos rhs_lex = rhs._renamed_s1;
                                   return (lhs_lex < rhs_lex);
                                 }
@@ -308,8 +335,8 @@ namespace rlxalgo {
                                   Pos rhs_ch = rec_text[rhs._pos + 1];
                                   if (lhs_ch < rhs_ch)
                                     return true;
-                                  Pos lhs_lex = rec_lex[pos_of(lhs)/3 + 1];
-                                  Pos rhs_lex = rec_lex[center + rhs._pos/3];
+                                  Pos lhs_lex = rec_new_names[pos_of(lhs)/3 + 1];
+                                  Pos rhs_lex = rec_new_names[center + rhs._pos/3];
                                   return (lhs_lex < rhs_lex);
                                 }
                             }
@@ -322,17 +349,17 @@ namespace rlxalgo {
                         {
                           /* We re-use the sequence `rec_lex` to store the inversion
                            * of the suffix array we've just computed. */
-                          rec_lex.resize(size(sux_array));
+                          rec_new_names.resize(size(sux_array));
 
                           rlxutil::parallel::portions portions
                           { begin(sux_array) , end(sux_array) , threads };
 
                           typedef itertype<decltype(sux_array)> suxit;
                           portions.apply(begin(sux_array),end(sux_array),
-                              [&rec_lex](suxit suxfrom, suxit suxto, suxit suxbeg)
+                              [&rec_new_names](suxit suxfrom, suxit suxto, suxit suxbeg)
                               {
                                 while (suxfrom != suxto) {
-                                  rec_lex[*suxfrom] = distance(suxbeg,suxfrom);
+                                  rec_new_names[*suxfrom] = distance(suxbeg,suxfrom);
                                   ++suxfrom;
                                 }
                               },begin(sux_array));
@@ -352,7 +379,7 @@ namespace rlxalgo {
            * us a perfect suffix array for S23 with no duplicate trigrams. */
 
           /* Use the lexicographically renamed string as inverse of S23. */
-          auto inv_sux = lex::move_newstring_from(renamed_trigrams);
+          auto inv_sux = lex::move_newstring_from(new_names);
           /* We make an S1 string. */
           auto s1 =
               make_s1_trigrams<sux::TGImpl::structure>(

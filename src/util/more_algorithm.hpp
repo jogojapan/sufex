@@ -39,6 +39,12 @@ namespace rlxutil {
 
 namespace rlx {
 
+  /** Identity function. Used as auxiliary. */
+  template<typename T>
+  inline T&&        id(T &&t) { return t; }
+  template <typename T>
+  inline const T&& cid(const T&& t) { return t; }
+
   /**
    * Sequential algorithms, i.e. common algorithms performed without the
    * use of parallelization (in other words, single-threaded algorithms).
